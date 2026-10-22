@@ -105,10 +105,10 @@ const brandCss=`
 `;const brandStyle=document.createElement('style');brandStyle.id='closeish-ui';brandStyle.textContent=brandCss;document.head.appendChild(brandStyle);
 const el=document.getElementById('app');
 const dayPack=()=>DATA[String(dayNum)];const questions=()=>Core.questions(dayPack());const currentQ=()=>questions()[round];const progressKey=()=>BOOT.date;
-const curProgress=()=>allProgress[progressKey()]||{date:BOOT.date,revision:BOOT.revision,runId:crypto.randomUUID(),responses:[],completed:false};
+const curProgress=()=>allProgress[progressKey()]||{date:BOOT.date,revision:BOOT.revision,runId:Api.newUuidV4(),responses:[],completed:false};
 function saveProgress(){
  const current=allProgress[progressKey()];
- if(current){current.runId||=crypto.randomUUID();current.responses||=[];current.date=BOOT.date;current.revision=BOOT.revision;current.updatedAt=Date.now();current.status=current.completed?'completed':(Number.isInteger(current.activeRound)||current.responses.length?'in_progress':'not_started');}
+ if(current){current.runId||=Api.newUuidV4();current.responses||=[];current.date=BOOT.date;current.revision=BOOT.revision;current.updatedAt=Date.now();current.status=current.completed?'completed':(Number.isInteger(current.activeRound)||current.responses.length?'in_progress':'not_started');}
  try{localStorage.setItem(STORAGE,JSON.stringify(allProgress))}catch{Api.storageWarning()}
 }
 function recordResponse(result){const saved=curProgress();saved.responses[round]=result;saved.activeRound=null;saved.activeDeadline=null;saved.activeDraft=null;saved.activeInputAt=null;saved.pendingSubmission=null;saved.phase='reveal';saved.lastRound=round;saved.completed=saved.responses.filter(Boolean).length===6;if(saved.completed){saved.finishedAt=Date.now();if(!originalRuns[saved.date]){originalRuns[saved.date]=structuredClone(saved);try{localStorage.setItem(ORIGINAL,JSON.stringify(originalRuns))}catch{Api.storageWarning()}}}allProgress[progressKey()]=saved;saveProgress();if(saved.completed)Stats.complete(saved)}
@@ -235,7 +235,7 @@ function timeoutRound(){
 }
 function skipRound(){if(cityLookupPending||curProgress().pendingSubmission)return;sendAnswer('',false,'skipped')}
 function nextRound(){if(round>=5){phase='end';render();return}round+=1;playRound()}
-function replayDay(){if(phase!=='end')return;allProgress[progressKey()]={date:BOOT.date,revision:BOOT.revision,runId:crypto.randomUUID(),responses:[],completed:false,practice:true};saveProgress();stopClock();round=0;deadline=null;confirmedMatch=null;inputValue='';phase='intro';answerBookOpen=null;catalogueLockedHeight=null;render()}
+function replayDay(){if(phase!=='end')return;allProgress[progressKey()]={date:BOOT.date,revision:BOOT.revision,runId:Api.newUuidV4(),responses:[],completed:false,practice:true};saveProgress();stopClock();round=0;deadline=null;confirmedMatch=null;inputValue='';phase='intro';answerBookOpen=null;catalogueLockedHeight=null;render()}
 async function submitAnswer(){
  if(staleDay){location.reload();return}
  if(phase!=='play'||cityLookupPending)return;

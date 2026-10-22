@@ -1,14 +1,27 @@
-/* CLOSEISH V17.2: static-browser transport. No private backend secrets belong here. */
+/* CLOSEISH V17.3: static-browser transport. No private backend secrets belong here. */
 (()=>{'use strict';
 const cfg=globalThis.CLOSEISH_CONFIG||{};
 const base=String(cfg.apiBase||'').replace(/\/+$/,'');
 const apiKey=typeof cfg.apiKey==='string'?cfg.apiKey:'';
 const TODAY_CACHE='closeish-today-cache-v1';
 const UUID_V4=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// randomUUID() needs HTTPS in many browsers. getRandomValues() also works over HTTP.
+// Do not downgrade to Math.random(): both playerId and runId must be UUID v4.
+function newUuidV4(){
+ const browserCrypto=globalThis.crypto;
+ if(typeof browserCrypto?.randomUUID==='function')return browserCrypto.randomUUID();
+ if(typeof browserCrypto?.getRandomValues!=='function')throw new Error('Secure random number generation is unavailable in this browser.');
+ const bytes=new Uint8Array(16);
+ browserCrypto.getRandomValues(bytes);
+ bytes[6]=(bytes[6]&0x0f)|0x40; // version 4
+ bytes[8]=(bytes[8]&0x3f)|0x80; // RFC 4122 variant
+ const hex=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+ return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+}
 let boot,started=false,playerId;
 try{playerId=localStorage.getItem('closeish-player-v1')}catch{}
 if(!UUID_V4.test(playerId||'')){
- playerId=crypto.randomUUID();
+ playerId=newUuidV4();
  try{localStorage.setItem('closeish-player-v1',playerId)}catch{}
 }
 function storageWarning(){
@@ -91,7 +104,7 @@ function question(id,action,fields={}){
  return action==='answer'?post(path,data):request(path+'?'+new URLSearchParams(data));
 }
 function loadScript(src){return new Promise((resolve,reject)=>{
- const script=document.createElement('script');script.src=src+'?v=17.2';script.onload=resolve;script.onerror=reject;document.head.appendChild(script);
+ const script=document.createElement('script');script.src=src+'?v=17.3';script.onload=resolve;script.onerror=reject;document.head.appendChild(script);
 })}
 async function start(){
  if(started)return;
@@ -99,7 +112,7 @@ async function start(){
  try{
   boot=await getToday();globalThis.CLOSEISH_BOOT=boot;
   try{localStorage.setItem('closeish-storage-check','1');localStorage.removeItem('closeish-storage-check')}catch{storageWarning()}
-  globalThis.CLOSEISHApi={question,storageWarning,post,playerId,getToday};
+  globalThis.CLOSEISHApi={question,storageWarning,post,playerId,getToday,newUuidV4};
   for(const file of ['/view-core.js','/community.js','/score-chart.js','/statistics-client.js','/game.js'])await loadScript(file);
   let checking=false;
   async function checkDate(){

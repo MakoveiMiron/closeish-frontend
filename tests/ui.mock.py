@@ -31,12 +31,12 @@ with sync_playwright() as p:
  page.evaluate('''() => {
   const saved=new Map();
   Object.defineProperty(window,'localStorage',{configurable:true,value:{getItem:k=>saved.get(k)??null,setItem:(k,v)=>saved.set(k,String(v)),removeItem:k=>saved.delete(k)}});
-  if(!crypto.randomUUID)Object.defineProperty(crypto,'randomUUID',{configurable:true,value:()=> 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.floor(Math.random()*16);return (c==='x'?r:(r&3|8)).toString(16)})});
+  window.__uuidV4=()=>{const b=crypto.getRandomValues(new Uint8Array(16));b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;const h=[...b].map(x=>x.toString(16).padStart(2,'0')).join('');return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`};
   window.__calls={answers:[],completed:0,hints:0};
  }''')
  page.evaluate('''boot => {
   window.CLOSEISH_BOOT=boot;
-  window.CLOSEISHApi={playerId:'00000000-0000-4000-8000-000000000001',storageWarning(){},
+  window.CLOSEISHApi={playerId:'00000000-0000-4000-8000-000000000001',newUuidV4:window.__uuidV4,storageWarning(){},
    async question(id,action,fields){
     if(action==='hints'){window.__calls.hints++;return {candidates:[]}}
     if(action==='catalogue')return {total:0,offset:0,entries:[]};

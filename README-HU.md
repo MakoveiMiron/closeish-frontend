@@ -1,10 +1,10 @@
-# CLOSEISH – statikus frontend V17.2 / Railway API
+# CLOSEISH – statikus frontend V17.3 / Railway API
 
 A csomag **csak a frontend**: sem a napi válaszlisták, sem a pontozási algoritmus, sem az adatbázis nem található benne. Nincs npm-függőség és buildlépés.
 
 ## Éles publikálás
 
-Másold a webtárhely gyökerébe ezeket: `index.html`, `style.css`, `config.js`, `api.js`, `view-core.js`, `community.js`, `score-chart.js`, `statistics-client.js`, `game.js`. A `_headers` fájlt is másold át, ha a tárhely támogatja az ilyen formátumú válaszfejléceket.
+Másold a webtárhely gyökerébe ezeket: `index.html`, `favicon.svg`, `style.css`, `config.js`, `api.js`, `view-core.js`, `community.js`, `score-chart.js`, `statistics-client.js`, `game.js`. A `_headers` fájlt is másold át, ha a tárhely támogatja az ilyen formátumú válaszfejléceket.
 
 A `config.js` alapértelmezetten a Railway API-ra mutat:
 
@@ -36,7 +36,7 @@ Megnyitás: `http://localhost:5173`. Node.js szükséges. A `scripts/dev.mjs` cs
 ## Működési szerződés
 
 - `GET /api/v1/today` adja az adott Europe/Budapest nap hat kérdését; `available:false` esetén nem kérünk másik napot.
-- A `playerId` egyszeri UUID v4, a `runId` új futásonként új UUID v4 a `localStorage`-ban.
+- A `playerId` egyszeri UUID v4, a `runId` új futásonként új UUID v4 a `localStorage`-ban. Ha `crypto.randomUUID()` HTTP alatt nem elérhető, a frontend a `crypto.getRandomValues()` biztonságos véletlenértékeiből állítja elő ugyanazt az UUID v4 formátumot (nem használ `Math.random()`-ot). Az éles oldalnak ettől függetlenül HTTPS-en kell működnie, különben a Railway `ALLOWED_ORIGINS=https://closeish.eu` szabálya a HTTP-oldal API-kéréseit elutasítja.
 - A válaszokat (vagy skip/timeout állapotot) külön `POST /api/v1/questions/:id/answer` pontozza; a kliens nem küld pontszámot, hanem eltárolja a szervertől kapott aláírt receiptet.
 - Hat receiptből készül a `POST /api/v1/results` tartós, újraküldhető várólistája. Hálózati hibánál, 429-nél, 503-nál nem feltételezünk sikert; 400-nál véglegesen eltávolítjuk a sorból, és megtartjuk a helyi futást. A 72 órás igazolás-érvényességet a backend vizsgálja.
 - A statisztikai pontértékeket és a `betterThanPercent` mezőt a backend szolgáltatja. A hisztogram 0–7200 között 200 pontos lépésekben, mind a 37 pontos értékkel jelenik meg; a görbe csak vizuálisan simított. A kliens nem számolja újra a százalékot.
@@ -56,6 +56,7 @@ Telepítést nem igénylő mockolt API-/várólista-teszt:
 
 ```sh
 node tests/transport-outbox.mock.mjs
+node tests/uuid-fallback.mock.mjs
 ```
 
 Opcionális böngészős interakciós teszt (Python Playwright + Chromium szükséges; a teszt közvetlenül `about:blank` oldalba tölti a UI-szkripteket, így nem küld valós API-kérést):
