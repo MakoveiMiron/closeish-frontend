@@ -1,0 +1,14 @@
+{
+  "name": "closeish-frontend",
+  "version": "17.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone static frontend with browser-local countdown.",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "start": "node scripts/dev.mjs"
+  }
+}
