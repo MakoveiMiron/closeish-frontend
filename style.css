@@ -1131,3 +1131,45 @@ body.edge-playing .edge-entrybar .guess-shell .textinput{font-size:20px}
 
 
 #storageNotice{position:sticky;top:0;z-index:100;background:#fff2bd;color:#19151f;padding:12px 20px;border-bottom:2px solid #19151f;font:700 13px Arial,sans-serif}#storageNotice[hidden]{display:none}.cal-day:disabled.cal-completed{opacity:1;color:var(--ink);background:var(--pink)}
+
+
+/* V17.4 — animated first impression, unobtrusive and reduced-motion safe */
+.closeish-boot{width:min(520px,calc(100% - 36px));margin:clamp(60px,13vh,160px) auto 60px;min-height:345px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:26px;color:var(--ink)}
+.boot-art{width:166px;height:166px;position:relative;display:grid;place-items:center;filter:drop-shadow(6px 8px 0 var(--ink))}
+.boot-orbit{position:absolute;inset:8px;border:4px solid var(--ink);border-radius:30% 70% 50% 50%;background:var(--lemon);animation:closeish-rotate 2.8s cubic-bezier(.4,0,.2,1) infinite}
+.boot-orbit.orbit-b{inset:23px;border-radius:50% 35% 50% 50%;background:var(--pink);animation-duration:2.1s;animation-direction:reverse}
+.boot-center{position:relative;z-index:2;display:grid;place-content:center;width:74px;height:74px;border:3px solid var(--ink);background:var(--paper);border-radius:50%;font:900 21px/1 var(--display);transform:rotate(-12deg)}
+.boot-center span{color:var(--blue)}
+.boot-marker{position:absolute;z-index:3;right:7px;top:8px;width:25px;height:25px;background:var(--hot);border:3px solid var(--ink);border-radius:50%;animation:closeish-bounce 1.2s ease-in-out infinite alternate}
+.boot-wordmark{font:900 clamp(37px,9vw,65px)/.95 var(--display-readable,var(--display));letter-spacing:-.06em}
+.boot-wordmark span{color:var(--blue)}
+.boot-wordmark i{font:normal 30px/1 var(--body);margin-left:9px;color:var(--hot)}
+.boot-progress{height:10px;width:min(220px,75vw);overflow:hidden;border:2px solid var(--ink);background:var(--paper);border-radius:99px}
+.boot-progress span{display:block;width:42%;height:100%;background:var(--lemon);animation:closeish-progress 1.5s ease-in-out infinite alternate}
+.closeish-boot.boot-blocked{gap:15px}.closeish-boot.boot-blocked #loadStatus{max-width:370px;font:700 14px/1.5 var(--body)}
+.closeish-boot.boot-blocked .boot-progress{display:none}
+@keyframes closeish-rotate{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes closeish-bounce{to{transform:translate(-6px,6px) scale(.85)}}
+@keyframes closeish-progress{from{transform:translateX(-110%)}to{transform:translateX(260%)}}
+/* End-of-day controls: matching outer height despite different shadows. */
+.run-summary .btnrow{align-items:stretch;gap:12px}
+.run-summary .btnrow .cta{display:inline-flex;min-height:45px;box-sizing:border-box;align-items:center;justify-content:center;line-height:1.2;padding:11px 14px;font-size:10px;vertical-align:middle;white-space:nowrap}
+/* The exact score histogram opens a dialog; the result card never expands. */
+.chart-data-open{display:flex;justify-content:space-between;gap:15px;align-items:center;width:100%;margin-top:auto;padding:12px 5px 5px;background:transparent;border:0;border-top:1px solid #ac99cb;color:var(--ink);font:800 10px/1.35 var(--mono);text-align:left;cursor:pointer}
+.chart-data-open span{font-size:20px;line-height:1;color:var(--blue)}
+.chart-data-open:hover,.chart-data-open:focus-visible{background:#e5d9fa}
+.modal-stats{width:min(510px,calc(100vw - 22px));max-height:min(700px,calc(100dvh - 28px));overflow:hidden;display:flex;flex-direction:column}
+.modal-stats .modalhead{flex:none}
+.modal-stats .modalcontent{display:flex;flex:1;min-height:0;flex-direction:column;padding:16px 20px 20px}
+.exact-count-intro{margin:0 0 12px;font:600 12px/1.5 var(--body)}
+.exact-count-scroll{min-height:0;max-height:58dvh;overflow-y:auto;overscroll-behavior:contain;border:2px solid var(--ink);border-radius:9px;background:#f5efff}
+.exact-count-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font:600 12px/1.4 var(--mono)}
+.exact-count-table thead th{position:sticky;top:0;z-index:2;padding:12px 15px;background:#dfd0f8;text-align:left;border-bottom:2px solid var(--ink);font-weight:900}
+.exact-count-table td,.exact-count-table tbody th{padding:10px 15px;border-bottom:1px solid #dacfe3;text-align:left}
+.exact-count-table tbody th{font-weight:700}
+.exact-count-table tbody tr:nth-child(even){background:#eee4f8}
+.exact-count-table tbody tr:last-child td,.exact-count-table tbody tr:last-child th{border-bottom:0}
+/* Keep the requested small print along the bottom, including after completion. */
+body.edge-ended .footer{display:flex!important}
+@media(max-width:520px){.modal-stats .modalcontent{padding:12px}.run-summary .btnrow{gap:9px}.run-summary .btnrow .cta{min-height:45px;padding:11px 10px;font-size:9px}.exact-count-scroll{max-height:64dvh}}
+@media(prefers-reduced-motion:reduce){.boot-orbit,.boot-marker,.boot-progress span{animation:none!important}.boot-orbit.orbit-a{transform:rotate(12deg)}.boot-orbit.orbit-b{transform:rotate(35deg)}}

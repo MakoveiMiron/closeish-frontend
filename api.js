@@ -1,4 +1,4 @@
-/* CLOSEISH V17.3: static-browser transport. No private backend secrets belong here. */
+/* CLOSEISH V17.4: static-browser transport. No private backend secrets belong here. */
 (()=>{'use strict';
 const cfg=globalThis.CLOSEISH_CONFIG||{};
 const base=String(cfg.apiBase||'').replace(/\/+$/,'');
@@ -104,7 +104,7 @@ function question(id,action,fields={}){
  return action==='answer'?post(path,data):request(path+'?'+new URLSearchParams(data));
 }
 function loadScript(src){return new Promise((resolve,reject)=>{
- const script=document.createElement('script');script.src=src+'?v=17.3';script.onload=resolve;script.onerror=reject;document.head.appendChild(script);
+ const script=document.createElement('script');script.src=src+'?v=17.4';script.onload=resolve;script.onerror=reject;document.head.appendChild(script);
 })}
 async function start(){
  if(started)return;
@@ -145,7 +145,7 @@ async function start(){
 // Keep two tabs from writing the same anonymous run concurrently.
 if(navigator.locks){
  navigator.locks.request('closeish-game-writer',{ifAvailable:true},async lock=>{
-  if(!lock){const el=document.getElementById('loadStatus');if(el)el.textContent='CLOSEISH is open in another tab. Close that tab, then reload.';return}
+  if(!lock){const el=document.getElementById('loadStatus');if(el){el.classList.remove('visually-hidden');el.textContent='CLOSEISH is open in another tab. Close that tab, then reload.';}document.getElementById('bootScreen')?.classList.add('boot-blocked');return}
   await start();await new Promise(resolve=>window.addEventListener('pagehide',resolve,{once:true}));
  });
  window.addEventListener('pageshow',event=>{if(event.persisted)location.reload()});

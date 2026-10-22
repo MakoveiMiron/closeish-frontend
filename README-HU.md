@@ -1,4 +1,4 @@
-# CLOSEISH – statikus frontend V17.3 / Railway API
+# CLOSEISH – statikus frontend V17.4 / Railway API
 
 A csomag **csak a frontend**: sem a napi válaszlisták, sem a pontozási algoritmus, sem az adatbázis nem található benne. Nincs npm-függőség és buildlépés.
 
@@ -66,3 +66,13 @@ python tests/ui.mock.py
 ```
 
 A `tests/countdown.browser.mjs` opcionális Playwright-futtatásához a külön backend és Playwright szükséges; a csomag nem telepít függőségeket automatikusan.
+
+
+## V17.4 – Felület és egyszeri napi játék
+- A pontos pontszámtáblázat a `VIEW EXACT SCORE COUNTS` gombbal külön, görgethető modalban jelenik meg; a 200 pontos lépcsők nincsenek csoportosítva.
+- A REPLAY DAY funkció és a gyakorló futás eltávolítva. A korábban már befejezett játék marad érvényben, a korábbi visszajátszásból visszaállítjuk az eredeti mentést, ha rendelkezésre áll.
+- A HOW TO PLAY hosszú `Eligibility comes first` bekezdését töröltük.
+- COPY RESULTS és MY DAYS egységes gombmagasságot kapott. A lábléc szövege változatlan.
+- A kezdeti statikus betöltőfelület animált, mobilbarát, reduced-motion kompatibilis. A hálózati hiba állapota és az újrapróbálkozás funkciója megmaradt.
+- Az anonim, eszközspecifikus adatokat továbbra is localStorage tárolja. A cookie nem előnyös általános helyi progresszhez; a backend első hivatalos beküldése számít. Adattörlés, böngészőváltás vagy más eszköz nem akadályozza meg új helyi próbálkozás kezdeményezését, de ugyanazzal a szerveroldali identitással a backend nem írja felül az első hivatalos eredményt.
+- A Chrome-bővítménytől eredő CSP `unsafe-eval` konzolüzenetre nem kapcsoltunk be `unsafe-eval`-t.

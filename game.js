@@ -51,6 +51,15 @@ const localDate=()=>BOOT.date;
 const canPlayDay=n=>BOOT.available && n===BOOT.day_number;
 let allProgress=stored(STORAGE,{});if(!allProgress||typeof allProgress!=='object'||Array.isArray(allProgress))allProgress={};
 const ORIGINAL='closeish-first-completed-v1';let originalRuns=stored(ORIGINAL,{});if(!originalRuns||typeof originalRuns!=='object'||Array.isArray(originalRuns))originalRuns={};
+// V17.4 removes practice/replay. Upgrade previously replayed devices to their original
+// completed day rather than accidentally showing a new playable attempt.
+for(const [date,original] of Object.entries(originalRuns)){
+ if(!original?.completed||!Array.isArray(original.responses)||original.responses.length!==6)continue;
+ const current=allProgress[date];
+ if(!current?.completed||current.practice||current.runId!==original.runId){
+  allProgress[date]=structuredClone(original);
+ }
+}
 let reviewQueue=stored(REVIEW,[]);if(!Array.isArray(reviewQueue))reviewQueue=[];
 let dayNum=BOOT.day_number||Core.dayNumber(BOOT.date);
 const availableDays=BOOT.published_dates;
@@ -66,7 +75,9 @@ if(!Object.keys(allProgress).length){
 }
 // Keep a completed historical revision rather than silently erase it on content updates.
 if(allProgress[BOOT.date]?.revision && allProgress[BOOT.date].revision!==BOOT.revision && BOOT.available){
- allProgress[BOOT.date+'@'+allProgress[BOOT.date].revision]=allProgress[BOOT.date];delete allProgress[BOOT.date];
+ allProgress[BOOT.date+'@'+allProgress[BOOT.date].revision]=structuredClone(allProgress[BOOT.date]);
+ // A completed day stays locked even if the daily content revision later changes.
+ if(!allProgress[BOOT.date].completed)delete allProgress[BOOT.date];
 }
 let archiveMonthIndex=0;
 let phase='intro',round=0,startedAt=null,deadline=null,feedback=null,showModal=null,warning='',inputValue='',activeHints=[],confirmedMatch=null,timerHandle=null,lastInputAt=null,lastInputDraft='';
@@ -108,7 +119,7 @@ const dayPack=()=>DATA[String(dayNum)];const questions=()=>Core.questions(dayPac
 const curProgress=()=>allProgress[progressKey()]||{date:BOOT.date,revision:BOOT.revision,runId:Api.newUuidV4(),responses:[],completed:false};
 function saveProgress(){
  const current=allProgress[progressKey()];
- if(current){current.runId||=Api.newUuidV4();current.responses||=[];current.date=BOOT.date;current.revision=BOOT.revision;current.updatedAt=Date.now();current.status=current.completed?'completed':(Number.isInteger(current.activeRound)||current.responses.length?'in_progress':'not_started');}
+ if(current){current.runId||=Api.newUuidV4();current.responses||=[];current.date=BOOT.date;current.revision=(current.completed&&current.revision)?current.revision:BOOT.revision;current.updatedAt=Date.now();current.status=current.completed?'completed':(Number.isInteger(current.activeRound)||current.responses.length?'in_progress':'not_started');}
  try{localStorage.setItem(STORAGE,JSON.stringify(allProgress))}catch{Api.storageWarning()}
 }
 function recordResponse(result){const saved=curProgress();saved.responses[round]=result;saved.activeRound=null;saved.activeDeadline=null;saved.activeDraft=null;saved.activeInputAt=null;saved.pendingSubmission=null;saved.phase='reveal';saved.lastRound=round;saved.completed=saved.responses.filter(Boolean).length===6;if(saved.completed){saved.finishedAt=Date.now();if(!originalRuns[saved.date]){originalRuns[saved.date]=structuredClone(saved);try{localStorage.setItem(ORIGINAL,JSON.stringify(originalRuns))}catch{Api.storageWarning()}}}allProgress[progressKey()]=saved;saveProgress();if(saved.completed)Stats.complete(saved)}
@@ -235,7 +246,6 @@ function timeoutRound(){
 }
 function skipRound(){if(cityLookupPending||curProgress().pendingSubmission)return;sendAnswer('',false,'skipped')}
 function nextRound(){if(round>=5){phase='end';render();return}round+=1;playRound()}
-function replayDay(){if(phase!=='end')return;allProgress[progressKey()]={date:BOOT.date,revision:BOOT.revision,runId:Api.newUuidV4(),responses:[],completed:false,practice:true};saveProgress();stopClock();round=0;deadline=null;confirmedMatch=null;inputValue='';phase='intro';answerBookOpen=null;catalogueLockedHeight=null;render()}
 async function submitAnswer(){
  if(staleDay){location.reload();return}
  if(phase!=='play'||cityLookupPending)return;
@@ -308,10 +318,9 @@ function dailyStatsHTML(){
  if(!data||!data.total)return `<section class="mock-stat-card" aria-live="polite">${heading}<p class="chart-note">${escapeHTML(note||(!data?'Loading daily results…':'No completed results yet.'))}</p><p class="chart-note">Only completed games count. No sample results are added.</p></section>`;
  const d=globalThis.CLOSEISHChart.distribution(data,data.official?.score??scoreSoFar());
  const comparison=data.comparison,pct=comparison?.betterThanPercent;
- const practice=data.official&&data.official.runId!==curProgress().runId;
  const legacy=!data.official&&!state.pending;
- const details=`<details class="chart-data"><summary>VIEW EXACT SCORE COUNTS +</summary><table><thead><tr><th>Score</th><th>Players</th></tr></thead><tbody>${data.histogram.map(row=>`<tr><td>${row.score}</td><td>${formatNum(row.count)}</td></tr>`).join('')}</tbody></table></details>`;
- return `<section class="mock-stat-card" aria-label="Daily score distribution" aria-live="polite">${heading}${data.mode==='memory'?'<p class="chart-note"><b>LOCAL TEST DATA — resets on server restart</b></p>':''}<div class="chart-scorecards"><div class="chart-your"><span>${data.official?'COUNTED SCORE':'YOUR SCORE'}</span><strong>${formatScore(d.score)}<small> / 7200</small></strong></div><div class="chart-average"><span>DAILY AVERAGE</span><strong>${formatNum(Math.round(d.mean))}<small> pts</small></strong></div><div class="chart-percentile"><span>SCORED HIGHER THAN</span><strong>${pct==null?'—':pct.toFixed(1)}<small>${pct==null?'':'%'}</small></strong><small>${pct==null?(comparison?'Waiting for another player':'No counted score yet'):'of the other '+formatNum(comparison.others)+(comparison.others===1?' player':' players')}</small></div></div><div class="chart-canvas">${globalThis.CLOSEISHChart.svg(d)}${globalThis.CLOSEISHChart.svg(d,true)}</div><div class="chart-legend"><span><i class="legend-profile"></i>Smoothed distribution</span><span><i class="legend-average"></i>Daily average</span><span><i class="legend-you"></i>${data.official?'Counted score':'Your score'}</span></div><p class="chart-note"><b>${formatNum(data.total)} completed games</b> · ${escapeHTML(data.date)}. Ties do not count as beaten. You are excluded from your comparison. The curve is smoothed; percentages use exact scores.</p>${practice?'<p class="chart-note">Practice run: the chart uses your first completed daily result. Replays do not change it.</p>':''}${data.revision!==BOOT.revision?'<p class="chart-note">Showing the question version of your counted result.</p>':''}${legacy?'<p class="chart-note">This saved run has no verified completion. It is not included in the comparison.</p>':''}${note?`<p class="chart-note">${escapeHTML(note)}</p>`:''}<div class="chart-quartiles"><div><span>LOWER QUARTILE</span><strong>${formatNum(d.q25)}</strong><small>25th percentile</small></div><div><span>MEDIAN SCORE</span><strong>${formatNum(d.median)}</strong><small>50th percentile</small></div><div><span>UPPER QUARTILE</span><strong>${formatNum(d.q75)}</strong><small>75th percentile</small></div></div>${details}</section>`;
+ const details=`<button type="button" class="chart-data-open" data-exact-counts aria-haspopup="dialog">VIEW EXACT SCORE COUNTS <span aria-hidden="true">↗</span></button>`;
+ return `<section class="mock-stat-card" aria-label="Daily score distribution" aria-live="polite">${heading}${data.mode==='memory'?'<p class="chart-note"><b>LOCAL TEST DATA — resets on server restart</b></p>':''}<div class="chart-scorecards"><div class="chart-your"><span>${data.official?'COUNTED SCORE':'YOUR SCORE'}</span><strong>${formatScore(d.score)}<small> / 7200</small></strong></div><div class="chart-average"><span>DAILY AVERAGE</span><strong>${formatNum(Math.round(d.mean))}<small> pts</small></strong></div><div class="chart-percentile"><span>SCORED HIGHER THAN</span><strong>${pct==null?'—':pct.toFixed(1)}<small>${pct==null?'':'%'}</small></strong><small>${pct==null?(comparison?'Waiting for another player':'No counted score yet'):'of the other '+formatNum(comparison.others)+(comparison.others===1?' player':' players')}</small></div></div><div class="chart-canvas">${globalThis.CLOSEISHChart.svg(d)}${globalThis.CLOSEISHChart.svg(d,true)}</div><div class="chart-legend"><span><i class="legend-profile"></i>Smoothed distribution</span><span><i class="legend-average"></i>Daily average</span><span><i class="legend-you"></i>${data.official?'Counted score':'Your score'}</span></div><p class="chart-note"><b>${formatNum(data.total)} completed games</b> · ${escapeHTML(data.date)}. Ties do not count as beaten. You are excluded from your comparison. The curve is smoothed; percentages use exact scores.</p>${data.revision!==BOOT.revision?'<p class="chart-note">Showing the question version of your counted result.</p>':''}${legacy?'<p class="chart-note">This saved run has no verified completion. It is not included in the comparison.</p>':''}${note?`<p class="chart-note">${escapeHTML(note)}</p>`:''}<div class="chart-quartiles"><div><span>LOWER QUARTILE</span><strong>${formatNum(d.q25)}</strong><small>25th percentile</small></div><div><span>MEDIAN SCORE</span><strong>${formatNum(d.median)}</strong><small>50th percentile</small></div><div><span>UPPER QUARTILE</span><strong>${formatNum(d.q75)}</strong><small>75th percentile</small></div></div>${details}</section>`;
 }
 
 function answerCataloguePanelHTML(){
@@ -362,7 +371,7 @@ function summaryTier(r){
  const zeroLabels={far:'TOO FAR',over:'CROSSED LIMIT',skipped:'SKIPPED',timeout:'TIME OUT',review:'NEEDS REVIEW',invalid:'INELIGIBLE',unverified:'NO VERIFIED DATA'};
  return zeroLabels[r.kind]||'NO SCORE';
 }
-function endHTML(){const results=curProgress().responses;return `<div class="end-screen"><div class="end-dashboard"><section class="run-summary"><div class="ribbon">✹ THE RUN IS DONE</div><h2>THAT WAS CLOSEISH.</h2><div class="end-score">${formatScore(scoreSoFar())}<small> / ${formatScore(MAX)}</small></div><div class="end-rows" aria-label="Point category, your answer, and earned points for each question">${questions().map((q,i)=>{const r=results[i];return `<div class="end-row"><span class="index">Q${i+1}</span><div class="end-row-detail"><strong class="tier">${escapeHTML(summaryTier(r))}</strong><div class="end-row-meta"><span class="end-row-answer">${escapeHTML(answerName(r))}</span><span class="end-row-points">${formatScore(r?.points??0)} pts</span></div></div></div>`}).join('')}</div><div class="btnrow"><button class="cta" id="shareBtn">COPY RESULTS ↗</button><button class="cta ghost" data-modal="archive">MY DAYS</button><button class="cta ghost" id="replayBtn" title="Practice again. Your first completed daily result remains in the statistics.">REPLAY DAY ↻</button></div></section>${dailyStatsHTML()}${answerCataloguePanelHTML()}</div></div>`}
+function endHTML(){const results=curProgress().responses;return `<div class="end-screen"><div class="end-dashboard"><section class="run-summary"><div class="ribbon">✹ THE RUN IS DONE</div><h2>THAT WAS CLOSEISH.</h2><div class="end-score">${formatScore(scoreSoFar())}<small> / ${formatScore(MAX)}</small></div><div class="end-rows" aria-label="Point category, your answer, and earned points for each question">${questions().map((q,i)=>{const r=results[i];return `<div class="end-row"><span class="index">Q${i+1}</span><div class="end-row-detail"><strong class="tier">${escapeHTML(summaryTier(r))}</strong><div class="end-row-meta"><span class="end-row-answer">${escapeHTML(answerName(r))}</span><span class="end-row-points">${formatScore(r?.points??0)} pts</span></div></div></div>`}).join('')}</div><div class="btnrow"><button class="cta" id="shareBtn">COPY RESULTS ↗</button><button class="cta ghost" data-modal="archive">MY DAYS</button></div></section>${dailyStatsHTML()}${answerCataloguePanelHTML()}</div></div>`}
 
 function calendarHTML(){
  const base=new Date(BOOT.date+'T12:00:00Z'),first=new Date(Date.UTC(base.getUTCFullYear(),base.getUTCMonth()+archiveMonthIndex,1));
@@ -381,10 +390,15 @@ let answerBookOpen=null;
 let catalogueLockedHeight=null;
 let modalTrigger='[data-modal="rules"]';
 function closeOverlay(){showModal=null;render();document.querySelector(modalTrigger)?.focus()}
+function exactScoresModalHTML(){
+ const stats=Stats.state(BOOT.date).data;
+ if(!stats?.histogram?.length)return '<p class="chart-note">Daily score counts are not available yet.</p>';
+ return `<p class="exact-count-intro"><strong>${formatNum(stats.total||0)}</strong> completed games · ${escapeHTML(stats.date||BOOT.date)}. Each possible score is shown separately.</p><div class="exact-count-scroll" role="region" tabindex="0" aria-label="All exact daily score counts"><table class="exact-count-table"><thead><tr><th scope="col">SCORE</th><th scope="col">PLAYERS</th></tr></thead><tbody>${stats.histogram.map(row=>`<tr><th scope="row">${formatScore(row.score)}</th><td>${formatNum(row.count)}</td></tr>`).join('')}</tbody></table></div>`;
+}
 function modalHTML(){
  if(!showModal)return '';
  const community=globalThis.CLOSEISHCommunity;
- const content=showModal==='rules'?community.guideHTML():showModal==='suggest'?community.suggestionHTML():showModal==='archive'?calendarHTML():showModal==='stats'?(dailyStatsHTML().match(/<details class="chart-data">[\s\S]*?<\/details>/)?.[0]||'<p>Statistics are not available yet.</p>').replace('<details','<details open'):'<h3>THE DAILY GAME OF LIMITS.</h3><p>Six questions. One edge.</p>';
+ const content=showModal==='rules'?community.guideHTML():showModal==='suggest'?community.suggestionHTML():showModal==='archive'?calendarHTML():showModal==='stats'?exactScoresModalHTML():'<h3>THE DAILY GAME OF LIMITS.</h3><p>Six questions. One edge.</p>';
  const title=showModal==='rules'?'HOW TO PLAY':showModal==='suggest'?'SUGGEST A QUESTION':showModal==='archive'?'MY DAYS':showModal==='stats'?'DAILY SCORE COUNTS':'ABOUT CLOSEISH';
  return `<div class="modalwrap" id="modalWrap"><div class="modal modal-${showModal}" role="dialog" aria-modal="true" aria-labelledby="overlayTitle"><div class="modalhead"><strong id="overlayTitle">${title}</strong><button id="closeModal" class="closebtn" aria-label="Close">×</button></div>${phase==='play'?'<div class="modal-timer-note" role="note">Your round timer keeps running while this is open.</div>':''}<div class="modalcontent">${content}</div></div></div>`;
 }
@@ -402,11 +416,11 @@ function unavailableHTML(){return `<div class="start-screen"><div class="start-k
 function render(){document.body.classList.toggle('edge-ended',phase==='end');document.body.classList.toggle('edge-playing',phase==='play');document.body.classList.toggle('edge-run',phase!=='intro');document.body.classList.toggle('edge-intro',phase==='intro');const p=curProgress();if(phase==='intro'&&p.completed)phase='end';const inner=!dayPack()?unavailableHTML():phase==='intro'?introHTML():phase==='play'?arenaHTML():phase==='reveal'?revealHTML():endHTML();el.innerHTML=`<header class="topbar"><div class="top-inner"><button class="logo" id="homeBtn" type="button" aria-label="${phase==='play'||phase==='reveal'?'Home navigation unavailable during the challenge':'CLOSEISH home'}" ${phase==='play'||phase==='reveal'?'disabled title="Finish all six rounds to return home"':''}>CLOSE<span class="period">ISH</span><svg viewBox="0 0 28 28" aria-hidden="true"><path fill="#ff6a55" stroke="#19151f" stroke-width="2" d="M14 1L18 9 27 7 22 15 27 23 17 21 13 28 10 19 1 20 6 13 2 5 11 9Z"/></svg></button><nav class="mainnav" aria-label="Main navigation">${unitControlHTML()}<button class="navbutton navsuggest" data-modal="suggest">SUGGEST +</button><button class="navbutton" data-modal="rules">HOW TO PLAY</button><button class="navbutton navarchive" data-modal="archive">MY DAYS ↗</button></nav></div></header><div class="ticker"><span>${('✳ KNOW IT. RISK IT. NAIL IT. &nbsp;&nbsp;&nbsp; ✳ ANY TOPIC. ONE LIMIT. &nbsp;&nbsp;&nbsp; ✳ NO GUESSING FROM A LIST. &nbsp;&nbsp;&nbsp; ').repeat(9)}</span></div><section class="hero"><div class="hero-inner"><div class="hero-copy"><div class="eyebrow"><i class="line"></i> THE DAILY GAME OF LIMITS</div><h1>CLOSE<span>ISH</span></h1><p class="hero-sub">Know something weird? <em>Put it on the line.</em></p></div><div class="hero-art" aria-hidden="true"><div class="art-panel"><div class="art-limit"></div><div class="art-label">THE LIMIT</div><svg class="art-line" viewBox="0 0 250 160"><polyline points="5,138 42,118 81,127 116,85 151,98 183,43 211,64 240,12"/><circle cx="240" cy="12" r="11"/></svg></div><div class="art-sticker">CLOSE<br>CALL!</div></div></div></section><div class="breakline">★ <b>THINK HARD</b> ★ <b>GO BIG</b> ★ <b>CHECK THE DIRECTION</b> ★ <b>COME BACK TOMORROW</b> ★</div><main class="shell content"><div class="section-head"><div><div class="micro">THE DAILY CHALLENGE</div></div><div class="day-badge">${dayPack()?'CHALLENGE #'+String(dayNum).padStart(3,'0'):BOOT.date}</div></div><div class="playgrid"> <section class="card maincard" id="gameArea">${inner}</section></div></main><footer class="shell footer"><strong>CLOSEISH / KNOW YOUR LIMITS.</strong><span>Wildly specific limits. Free-text answers. No ads.</span></footer>${modalHTML()}`;
  bindUnitControl();
  document.getElementById('homeBtn')?.addEventListener('click',()=>{if(phase==='play'||phase==='reveal')return;stopClock();answerBookOpen=null;catalogueLockedHeight=null;phase=curProgress().completed?'end':'intro';render()});document.querySelectorAll('[data-modal]').forEach(b=>b.addEventListener('click',()=>{modalTrigger=`[data-modal="${b.dataset.modal}"]`;showModal=b.dataset.modal;if(showModal==='rules')globalThis.CLOSEISHCommunity.resetGuide();if(showModal==='archive')archiveMonthIndex=0;render()}));document.getElementById('closeModal')?.addEventListener('click',closeOverlay);document.getElementById('modalWrap')?.addEventListener('mousedown',e=>{if(e.target.id==='modalWrap')closeOverlay()});document.querySelectorAll('[data-cal-step]').forEach(b=>b.addEventListener('click',()=>{archiveMonthIndex+=Number(b.dataset.calStep);render()}));document.querySelectorAll('[data-day]').forEach(b=>b.addEventListener('click',()=>{showModal=null;showDay(+b.dataset.day)}));
- document.getElementById('startBtn')?.addEventListener('click',()=>{let saved=curProgress();if(Number.isInteger(saved.activeRound)&&saved.activeDeadline){round=saved.activeRound;deadline=saved.activeDeadline;restoreDraft(saved);phase='play';render();if(timerRemaining()<=0)timeoutRound();else startClock();return}round=saved.responses.findIndex(x=>!x);if(round<0)round=saved.responses.length||0;playRound()});document.getElementById('answerForm')?.addEventListener('submit',e=>{e.preventDefault();submitAnswer()});
+ document.getElementById('startBtn')?.addEventListener('click',()=>{let saved=curProgress();if(saved.completed){phase='end';render();return}if(Number.isInteger(saved.activeRound)&&saved.activeDeadline){round=saved.activeRound;deadline=saved.activeDeadline;restoreDraft(saved);phase='play';render();if(timerRemaining()<=0)timeoutRound();else startClock();return}round=saved.responses.findIndex(x=>!x);if(round<0)round=saved.responses.length||0;playRound()});document.getElementById('answerForm')?.addEventListener('submit',e=>{e.preventDefault();submitAnswer()});
  const field=document.getElementById('guess');if(field){field.addEventListener('input',updateHints);if(inputValue){activeHints=candidateMatches(currentQ(),inputValue);refreshInlineHint()}}
- document.getElementById('replayBtn')?.addEventListener('click',replayDay);document.getElementById('skipBtn')?.addEventListener('click',skipRound);document.getElementById('nextBtn')?.addEventListener('click',nextRound);document.getElementById('reviewBtn')?.addEventListener('click',submitReview);document.getElementById('shareBtn')?.addEventListener('click',share);
+ document.getElementById('skipBtn')?.addEventListener('click',skipRound);document.getElementById('nextBtn')?.addEventListener('click',nextRound);document.getElementById('reviewBtn')?.addEventListener('click',submitReview);document.getElementById('shareBtn')?.addEventListener('click',share);
  bindCataloguePanel();
- document.querySelector('.end-screen .chart-data summary')?.addEventListener('click',e=>{e.preventDefault();modalTrigger='.end-screen .chart-data summary';showModal='stats';render()});
+
  document.body.classList.toggle('overlay-open',Boolean(showModal));
  [...el.children].forEach(child=>{if(child.id!=='modalWrap')child.inert=Boolean(showModal)});
  if(showModal==='suggest')globalThis.CLOSEISHCommunity.bindSuggestion();
@@ -424,6 +438,11 @@ function restore(){
  if(saved.phase==='reveal'&&saved.responses[saved.lastRound]){round=saved.lastRound;feedback=saved.responses[round];phase='reveal';render();return}
  phase='intro';render();
 }
+// The statistics panel is replaced after server refreshes: event delegation survives.
+document.addEventListener('click',event=>{
+ if(!event.target.closest('[data-exact-counts]'))return;
+ modalTrigger='[data-exact-counts]';showModal='stats';render();
+});
 window.addEventListener('closeish-statistics',()=>{
  const panel=document.querySelector('.end-screen .mock-stat-card');
  if(panel){const holder=document.createElement('div');holder.innerHTML=dailyStatsHTML();panel.replaceWith(holder.firstElementChild);}

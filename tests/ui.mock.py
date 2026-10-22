@@ -28,6 +28,7 @@ with sync_playwright() as p:
  page.on('pageerror',lambda e:print('PAGEERROR',e))
  page.on('console',lambda m:print('CONSOLE',m.text))
  page.set_content('<!doctype html><html><head></head><body><div id="storageNotice" hidden></div><div id="app"></div></body></html>')
+ page.add_style_tag(content=(ROOT/'style.css').read_text())
  page.evaluate('''() => {
   const saved=new Map();
   Object.defineProperty(window,'localStorage',{configurable:true,value:{getItem:k=>saved.get(k)??null,setItem:(k,v)=>saved.set(k,String(v)),removeItem:k=>saved.delete(k)}});
@@ -45,7 +46,12 @@ with sync_playwright() as p:
      points:0,tier:'NO SCORE',autoLocked:fields.automatic,receipt:'signed-'+window.__calls.answers.length}};
    }
   };
-  window.CLOSEISHStats={state(){return {loading:false,error:'',pending:false}},complete(){window.__calls.completed++},refresh(){}};
+  window.CLOSEISHStats={state(){return {loading:false,error:'',pending:false,data:{
+     date:'2026-10-22',revision:'fb3029da186b169c678ebe8b',mode:'postgres',total:1,mean:1200,q25:1200,median:1200,q75:1200,
+     histogram:Array.from({length:37},(_,i)=>({score:i*200,count:i===6?1:0})),
+     official:{score:1200,revision:'fb3029da186b169c678ebe8b',runId:'00000000-0000-4000-8000-000000000001'},
+     comparison:{score:1200,others:0,lower:0,equal:0,higher:0,betterThanPercent:null}
+    }}},complete(){window.__calls.completed++},refresh(){}};
  }''',BOOT)
  for name in ['view-core.js','community.js','score-chart.js','game.js']:
   page.add_script_tag(content=(ROOT/name).read_text())
@@ -70,16 +76,29 @@ with sync_playwright() as p:
  page.locator('.run-answers .catalogue-question').wait_for()
  page.locator('[data-rows="0"]').wait_for(state='attached')
  page.locator('#bookBack').click()
- page.locator('#replayBtn').click()
- page.locator('#startBtn').click()
+ assert page.locator('#replayBtn').count()==0
+ assert page.get_by_text('REPLAY DAY').count()==0
  assert page.evaluate("JSON.parse(localStorage.getItem('closeish-progress-v2'))['2026-10-22'].runId")
  assert page.evaluate("JSON.parse(localStorage.getItem('closeish-first-completed-v1'))['2026-10-22'].completed") is True
- # Browser clock advances locally; there is no per-second request to any API.
- before=page.evaluate('window.__calls.answers.length')
- page.clock.fast_forward(31000)
- page.locator('#nextBtn').wait_for(timeout=3000)
- assert page.evaluate('window.__calls.answers.length')==before+1
- assert page.evaluate('window.__calls.answers.at(-1).kind')=='timeout'
+ assert page.locator('[data-exact-counts]').count()==1
+ assert page.locator('.end-screen .exact-count-table').count()==0
+ page.locator('[data-exact-counts]').click()
+ assert page.get_by_role('dialog',name='DAILY SCORE COUNTS').count()==1
+ assert page.locator('.modal-stats .exact-count-table tbody tr').count()==37
+ assert page.locator('.modal-stats .exact-count-scroll').evaluate('(e)=>getComputedStyle(e).overflowY')=='auto'
+ page.keyboard.press('Escape')
+ assert page.get_by_role('dialog').count()==0
+ page.locator('[data-modal="rules"]').first.click()
+ assert page.get_by_text('Eligibility comes first').count()==0
+ page.locator('#closeModal').click()
+ assert page.locator('.footer').inner_text().endswith('Wildly specific limits. Free-text answers. No ads.')
+ heights=page.locator('.run-summary .btnrow .cta').evaluate_all('(els)=>els.map(e=>Math.round(e.getBoundingClientRect().height))')
+ assert len(heights)==2 and len(set(heights))==1, heights
+ page.locator('#homeBtn').click()
+ assert page.locator('.end-screen').count()==1
+ assert page.locator('#startBtn').count()==0
+ assert page.evaluate('window.__calls.answers.length')==6
  print(json.dumps({'passed':True,'sixSkippedAndSigned':True,'catalogueAfterCompletion':True,
-                   'timerDeadlinePersisted':True,'browserOnlyTimeout':True,'replayKeepsFirstRun':True},indent=2))
+                   'timerDeadlinePersisted':True,'replayRemoved':True,'modal37ExactCounts':True,
+                   'rulesShortened':True,'buttonsSameHeight':True,'completedDayLocked':True},indent=2))
  browser.close()

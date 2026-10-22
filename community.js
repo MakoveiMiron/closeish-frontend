@@ -66,7 +66,6 @@ function guideHTML(){return `<section class="guide-single" aria-labelledby="guid
  <div class="guide-hero-line"><span class="micro">SIX ROUNDS. ONE EDGE.</span><span class="guide-stamp">HOW CLOSE?</span></div>
  <h3 id="guideSingleTitle">NAME IT. GET CLOSE.<br><em>DON'T CROSS.</em></h3>
  <p class="guide-lead">Each question gives you a numerical limit. <strong>Name something</strong> as close to that limit as you can — from the allowed side.</p>
- <p class="guide-lead"><strong>Eligibility comes first:</strong> name an entity from the question’s category. Extra eligibility restrictions are used when the natural answer pool would exceed 10,000 entities; any such restrictions must be clear in the question. A valid name on the wrong side of the limit scores 0 points.</p>
  <div class="guide-example"><span class="micro">FOR EXAMPLE</span><p>Name a movie <strong>at most 120 minutes</strong> long.</p>
  <div class="guide-limit-row"><span class="guide-direction-chip">↑ AT MOST</span><strong>120<span> MIN</span></strong></div>
  <div class="guide-example-answers"><div><b>120 min</b><span>PERFECT · 1200 PTS</span></div><div><b>118 min</b><span>CLOSE · SCORES</span></div><div><b>135 min</b><span>WRONG SIDE · 0 PTS</span></div></div>
