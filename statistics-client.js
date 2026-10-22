@@ -4,20 +4,23 @@
  const UUID_V4=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
  let saved;
  try{saved=JSON.parse(localStorage.getItem(KEY))}catch{}
- if(!saved||!Array.isArray(saved.outbox)||!Array.isArray(saved.accepted))saved={outbox:[],accepted:[],errors:{}};
+ if(!saved||!Array.isArray(saved.outbox))saved={outbox:[],errors:{}};
+ const accepted=new Set(Array.isArray(saved.accepted)?saved.accepted:[]);
+ if(globalThis.CLOSEISH_REMOTE_PROGRESS?.counted)accepted.add(Api.playerId+':'+BOOT.date);
+ delete saved.accepted; // Only unsent receipts/errors remain in localStorage.
  saved.errors||={};
  // A body is not created from a legacy unsigned progress entry.
  saved.outbox=saved.outbox.filter(item=>item&&UUID_V4.test(item.playerId||'')&&UUID_V4.test(item.runId||'')&&Array.isArray(item.receipts)&&item.receipts.length===6&&item.receipts.every(r=>typeof r==='string'&&r.length>0));
  const states=new Map(),statsRetryAt=new Map();let flushing=false;
  const key=date=>Api.playerId+':'+date;
- function persist(){try{localStorage.setItem(KEY,JSON.stringify(saved))}catch{Api.storageWarning()}}
+ function persist(){try{if(!saved.outbox.length&&!Object.keys(saved.errors).length)localStorage.removeItem(KEY);else localStorage.setItem(KEY,JSON.stringify(saved))}catch{Api.storageWarning()}}
  function state(date){return {...states.get(date),pending:saved.outbox.some(x=>x.playerId===Api.playerId&&x.date===date),error:saved.errors[key(date)]||states.get(date)?.error}}
- function update(date,value){states.set(date,{...states.get(date),...value});window.dispatchEvent(new Event('closeish-statistics'))}
+ function update(date,value,notify=true){states.set(date,{...states.get(date),...value});if(notify)window.dispatchEvent(new Event('closeish-statistics'))}
  function backoff(error){return Math.max(30000,Number(error?.retryAfterSeconds||0)*1000)}
  async function refresh(date,revision){
   if(BOOT.statistics==='disabled'){update(date,{loading:false,error:'Daily statistics are not enabled on this server.'});return}
   if(states.get(date)?.loading||Date.now()<(statsRetryAt.get(date)||0))return;
-  update(date,{loading:true});
+  update(date,{loading:true},false); // Loading alone must not redraw the existing chart.
   try{
    let {statistics}=await Api.post('/api/v1/statistics',{date,revision,playerId:Api.playerId});
    if(statistics?.official?.revision&&statistics.official.revision!==revision){
@@ -26,14 +29,13 @@
    if(!statistics||!Array.isArray(statistics.histogram))throw new Error('Invalid statistics response');
    statsRetryAt.delete(date);
    if(statistics.official){
-    const id=key(date);if(!saved.accepted.includes(id))saved.accepted.push(id);
-    saved.accepted=saved.accepted.slice(-730);delete saved.errors[id];persist();
+    const id=key(date);accepted.add(id);delete saved.errors[id];persist();
    }
-   update(date,{data:statistics,error:null});
+   update(date,{data:statistics,error:null},false);
   }catch(error){
    if(error.status===429||error.status===503||!error.status){statsRetryAt.set(date,Date.now()+backoff(error))}
    update(date,{error:error.status===429?'Daily statistics are rate-limited. Retrying later.':
-    'Daily results are temporarily unavailable. Your game remains saved on this device.'});
+    'Daily results are temporarily unavailable. Your game remains saved on this device.'},false);
   }finally{update(date,{loading:false})}
  }
  async function flush(){
@@ -48,12 +50,11 @@
     try{
      const {statistics}=await Api.post('/api/v1/results',body);
      saved.outbox.splice(i,1);
-     if(!saved.accepted.includes(id))saved.accepted.push(id);
-     saved.accepted=saved.accepted.slice(-730);delete saved.errors[id];persist();
+     accepted.add(id);delete saved.errors[id];persist();
      if(item.playerId===Api.playerId){
       update(item.date,{data:statistics,error:null});
-      // A post succeeded: fetch current statistics now rather than waiting for the next 30s refresh.
-      statsRetryAt.delete(item.date);refresh(item.date,item.revision);
+      // /results already returned the fresh authoritative statistics.
+      statsRetryAt.delete(item.date);
      }
     }catch(error){
      if(error.status===400){
@@ -80,16 +81,17 @@
   const valid=progress.completed&&!progress.migrated&&UUID_V4.test(progress.runId||'')&&
    /^[0-9a-f]{24}$/i.test(progress.revision||'')&&receipts?.length===6&&
    receipts.every(r=>typeof r==='string'&&r.length>0);
-  if(BOOT.statistics!=='disabled'&&valid&&!saved.accepted.includes(id)&&!saved.errors[id]&&
+  if(BOOT.statistics!=='disabled'&&valid&&!accepted.has(id)&&!saved.errors[id]&&
      !saved.outbox.some(x=>x.date===progress.date&&x.playerId===Api.playerId)){
    saved.outbox.push({date:progress.date,revision:progress.revision,runId:progress.runId,playerId:Api.playerId,receipts});
    persist();update(progress.date,{});
   }
-  flush().finally(()=>refresh(progress.date,progress.revision));
+  flush().finally(()=>{if(!states.get(progress.date)?.data&&!saved.outbox.some(x=>x.date===progress.date))refresh(progress.date,progress.revision)});
  }
  globalThis.CLOSEISHStats={state,complete,refresh,flush};
- window.addEventListener('online',()=>{flush();if(BOOT.available)refresh(BOOT.date,BOOT.revision)});
- document.addEventListener('visibilitychange',()=>{if(!document.hidden){flush();if(BOOT.available&&states.get(BOOT.date)?.data)refresh(BOOT.date,BOOT.revision)}});
+ // Resume only queued result uploads on reconnect/focus. Never re-fetch a displayed chart.
+ window.addEventListener('online',()=>{flush()});
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)flush()});
  setInterval(()=>{if(!document.hidden&&saved.outbox.length)flush()},30000);
  persist();flush();
 })();

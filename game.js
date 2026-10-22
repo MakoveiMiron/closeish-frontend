@@ -1,7 +1,8 @@
 (()=>{'use strict';
 const Core=globalThis.CLOSEISHCore;
 const Api=globalThis.CLOSEISHApi, Stats=globalThis.CLOSEISHStats, BOOT=globalThis.CLOSEISH_BOOT;
-const DATA=BOOT.available?{[BOOT.day_number]:BOOT.questions}:{}, TODAY=BOOT.date, MAX=7200, STORAGE='closeish-progress-v2', REVIEW='closeish-review-v2';
+const DATA=BOOT.available?{[BOOT.day_number]:BOOT.questions}:{}, TODAY=BOOT.date, MAX=7200, STORAGE='closeish-progress-v2', PENDING='closeish-pending-v1', REVIEW='closeish-review-v2';
+const REMOTE=globalThis.CLOSEISH_REMOTE_PROGRESS||{};
 let cityLookupPending=false; // One submission in flight; retained name for UI compatibility.
 const CATEGORIES={history:'HISTORY',geography:'GEOGRAPHY',music:'MUSIC',culture:'CULTURE & HERITAGE',science:'SCIENCE',technology:'TECH & GAMES',sports:'SPORTS',literature:'LITERATURE',biology:'BIOLOGY',economics:'ECONOMICS',environment:'ENVIRONMENT',astronomy:'ASTRONOMY',society:'SOCIETY',education:'EDUCATION',language:'LANGUAGE & WORDPLAY',design:'ART & DESIGN',transport:'TRANSPORT',demography:'DEMOGRAPHY',housing:'HOUSING',wildlife:'WILDLIFE','cinema':'CINEMA','maritime-history':'MARITIME HISTORY','motorsport':'MOTORSPORT','travel':'TRAVEL','timekeeping':'TIMEKEEPING','videogames':'VIDEO GAMES','natural-wonders':'NATURAL WONDERS','civic-life':'CIVIC LIFE','music-technology':'MUSIC TECHNOLOGY','international-money':'CURRENCIES','river-history':'RIVER HISTORY','protected-places':'NATIONAL PARKS','jobs-economy':'LABOUR MARKET','solar-science':'SOLAR SCIENCE','published-books':'BOOKS','human-development':'HUMAN DEVELOPMENT','infrastructure':'BRIDGES'};
 const TIERS=[{points:1200,name:'PERFECT HIT',short:'1200'},{points:1000,name:'RAZOR EDGE',short:'1000'},{points:800,name:'CLOSE CALL',short:'800'},{points:600,name:'SOLID HIT',short:'600'},{points:400,name:'IN THE ZONE',short:'400'},{points:200,name:'ON THE BOARD',short:'200'}];
@@ -60,7 +61,47 @@ for(const [date,original] of Object.entries(originalRuns)){
   allProgress[date]=structuredClone(original);
  }
 }
-let reviewQueue=stored(REVIEW,[]);if(!Array.isArray(reviewQueue))reviewQueue=[];
+// Fresh installs keep only the UUID and the latest UNSENT local actions.
+// Successful answers and all calendar history are restored from PostgreSQL.
+const pendingLocal=stored(PENDING,null);
+if(REMOTE.progress){
+ const serverDay=REMOTE.progress;
+ const sameRun=pendingLocal?.date===BOOT.date&&pendingLocal.runId===serverDay.runId;
+ const localActive=sameRun&&!serverDay.completed&&Number.isInteger(pendingLocal.activeRound)&&
+   pendingLocal.activeRound>=serverDay.responses.length;
+ allProgress[BOOT.date]={...serverDay,
+   ...(localActive?{activeRound:pendingLocal.activeRound,activeDeadline:pendingLocal.activeDeadline,
+     activeDraft:pendingLocal.activeDraft,activeInputAt:pendingLocal.activeInputAt,phase:pendingLocal.phase||'play'}:{}),
+   ...(sameRun&&!serverDay.completed&&pendingLocal.pendingSubmission&&pendingLocal.pendingSubmission.round>=serverDay.responses.length?{pendingSubmission:pendingLocal.pendingSubmission}:{})};
+}else if(pendingLocal?.date===BOOT.date&&pendingLocal.revision===BOOT.revision){
+ allProgress[BOOT.date]={date:BOOT.date,revision:BOOT.revision,runId:pendingLocal.runId,
+  responses:[],completed:false,activeRound:pendingLocal.activeRound,activeDeadline:pendingLocal.activeDeadline,
+  activeDraft:pendingLocal.activeDraft,activeInputAt:pendingLocal.activeInputAt,phase:pendingLocal.phase||'intro',
+  pendingSubmission:pendingLocal.pendingSubmission};
+}
+for(const item of REMOTE.days||[]){
+ if(item.date===BOOT.date&&REMOTE.progress)continue;
+ allProgress[item.date]={date:item.date,revision:item.revision,completed:item.completed,
+  responses:Array.from({length:item.answers},()=>({})),updatedAt:item.updatedAt};
+}
+const archiveFetched=new Set([REMOTE.month]);
+let archiveRequestId=0;
+async function loadArchiveMonth(){
+ const base=new Date(BOOT.date+'T12:00:00Z');
+ const year=base.getUTCFullYear(),month=base.getUTCMonth()+archiveMonthIndex;
+ const monthDate=new Date(Date.UTC(year,month,1)).toISOString().slice(0,7);
+ if(archiveFetched.has(monthDate))return;
+ const seq=++archiveRequestId;
+ try{
+  const value=await Api.getProgress(monthDate);if(seq!==archiveRequestId)return;
+  archiveFetched.add(monthDate);
+  for(const item of value.days||[])if(item.date!==BOOT.date){
+   allProgress[item.date]={date:item.date,revision:item.revision,completed:item.completed,
+    responses:Array.from({length:item.answers},()=>({})),updatedAt:item.updatedAt};
+  }
+  if(showModal==='archive')render();
+ }catch(error){console.warn('[CLOSEISH] Archive load failed:',error?.code||error?.message)}
+}
 let dayNum=BOOT.day_number||Core.dayNumber(BOOT.date);
 const availableDays=BOOT.published_dates;
 // One-time migration from V15, only when it exists on this same browser origin.
@@ -81,6 +122,8 @@ if(allProgress[BOOT.date]?.revision && allProgress[BOOT.date].revision!==BOOT.re
 }
 let archiveMonthIndex=0;
 let phase='intro',round=0,startedAt=null,deadline=null,feedback=null,showModal=null,warning='',inputValue='',activeHints=[],confirmedMatch=null,timerHandle=null,lastInputAt=null,lastInputDraft='';
+// Request the daily score snapshot only when results first appear in this page load.
+let chartSnapshotRequested=false,completedCountedByServer=Boolean(REMOTE.counted);
 const brandCss=`
 /* CLOSEISH identity + archive calendar only. Underlying design system unchanged. */
 .logo{font-size:clamp(19px,2.2vw,28px);letter-spacing:-.055em;white-space:nowrap}
@@ -119,10 +162,21 @@ const dayPack=()=>DATA[String(dayNum)];const questions=()=>Core.questions(dayPac
 const curProgress=()=>allProgress[progressKey()]||{date:BOOT.date,revision:BOOT.revision,runId:Api.newUuidV4(),responses:[],completed:false};
 function saveProgress(){
  const current=allProgress[progressKey()];
- if(current){current.runId||=Api.newUuidV4();current.responses||=[];current.date=BOOT.date;current.revision=(current.completed&&current.revision)?current.revision:BOOT.revision;current.updatedAt=Date.now();current.status=current.completed?'completed':(Number.isInteger(current.activeRound)||current.responses.length?'in_progress':'not_started');}
- try{localStorage.setItem(STORAGE,JSON.stringify(allProgress))}catch{Api.storageWarning()}
+ if(!current)return;
+ current.runId||=Api.newUuidV4();current.responses||=[];current.date=BOOT.date;
+ current.revision=(current.completed&&current.revision)?current.revision:BOOT.revision;
+ current.updatedAt=Date.now();
+ // Never serialize historical days or synchronized answers into localStorage.
+ const unsynced={date:current.date,revision:current.revision,runId:current.runId,
+   activeRound:current.activeRound,activeDeadline:current.activeDeadline,
+   activeDraft:current.activeDraft,activeInputAt:current.activeInputAt,
+   pendingSubmission:current.pendingSubmission,phase:current.phase};
+ try{
+  if(current.completed)localStorage.removeItem(PENDING);
+  else localStorage.setItem(PENDING,JSON.stringify(unsynced));
+ }catch{Api.storageWarning()}
 }
-function recordResponse(result){const saved=curProgress();saved.responses[round]=result;saved.activeRound=null;saved.activeDeadline=null;saved.activeDraft=null;saved.activeInputAt=null;saved.pendingSubmission=null;saved.phase='reveal';saved.lastRound=round;saved.completed=saved.responses.filter(Boolean).length===6;if(saved.completed){saved.finishedAt=Date.now();if(!originalRuns[saved.date]){originalRuns[saved.date]=structuredClone(saved);try{localStorage.setItem(ORIGINAL,JSON.stringify(originalRuns))}catch{Api.storageWarning()}}}allProgress[progressKey()]=saved;saveProgress();if(saved.completed)Stats.complete(saved)}
+function recordResponse(result,counted=false){const saved=curProgress();saved.responses[round]=result;saved.activeRound=null;saved.activeDeadline=null;saved.activeDraft=null;saved.activeInputAt=null;saved.pendingSubmission=null;saved.phase='reveal';saved.lastRound=round;saved.completed=saved.responses.filter(Boolean).length===6;if(saved.completed){saved.finishedAt=Date.now();completedCountedByServer=Boolean(counted);}allProgress[progressKey()]=saved;saveProgress();/* Request statistics when the end screen first appears, not on round-six reveal. */}
 function scoreSoFar(){return curProgress().responses.filter(Boolean).reduce((s,x)=>s+(x.points||0),0)}
 function roundTimeLimit(){return Number(currentQ()?.time_limit_seconds)||30}
 // Browser-local countdown. No tick endpoint, WebSocket or server push.
@@ -130,8 +184,14 @@ function roundTimeLimit(){return Number(currentQ()?.time_limit_seconds)||30}
 function timerRemaining(){return deadline?Math.max(0,Math.ceil((deadline-Date.now())/1000)):roundTimeLimit()}
 function stopClock(){if(timerHandle){clearInterval(timerHandle);timerHandle=null}}
 function startClock(){stopClock();timerHandle=setInterval(()=>{if(phase!=='play')return;const t=timerRemaining();const clock=document.getElementById('clock');if(clock){clock.textContent=String(t).padStart(2,'0')+'s';clock.classList.toggle('low',t<=7)}if(t<=0){timeoutRound();}},120)}
-function playRound(){phase='play';confirmedMatch=null;feedback=null;warning='';inputValue='';lastInputAt=null;lastInputDraft='';deadline=Date.now()+roundTimeLimit()*1000;const saved=curProgress();saved.activeRound=round;saved.activeDeadline=deadline;saved.activeDraft='';saved.activeInputAt=null;saved.phase='play';allProgress[progressKey()]=saved;saveProgress();render();startClock();document.getElementById('guess')?.focus()}
-function finalize(obj){if(phase!=='play')return;stopClock();phase='reveal';deadline=null;feedback=obj;recordResponse(obj);render();requestAnimationFrame(()=>document.getElementById('gameArea')?.scrollIntoView({behavior:'instant',block:'start'}))}
+function playRound(){phase='play';confirmedMatch=null;feedback=null;warning='';inputValue='';lastInputAt=null;lastInputDraft='';deadline=Date.now()+roundTimeLimit()*1000;const saved=curProgress();saved.activeRound=round;saved.activeDeadline=deadline;saved.activeDraft='';saved.activeInputAt=null;saved.phase='play';allProgress[progressKey()]=saved;saveProgress();render();startClock();document.getElementById('guess')?.focus();
+ // A single milestone write per round; never one DB write per keystroke or timer tick.
+ Api.post('/api/v1/progress/start',{playerId:Api.playerId,date:BOOT.date,revision:BOOT.revision,
+   runId:saved.runId,activeRound:round,activeDeadline:deadline}).catch(error=>{
+    if(error.status===409){staleDay=true;showNotice('This day is already locked to a different run. Reload to restore it.');}
+    else console.warn('[CLOSEISH] Start milestone will be retried by the next answer:',error?.code||error?.message);
+ });}
+function finalize(obj,counted=false){if(phase!=='play')return;stopClock();phase='reveal';deadline=null;feedback=obj;recordResponse(obj,counted);render();requestAnimationFrame(()=>document.getElementById('gameArea')?.scrollIntoView({behavior:'instant',block:'start'}))}
 
 // Persist a draft with its real input timestamp. Only text present before the deadline can auto-lock.
 function saveDraft(){
@@ -206,7 +266,7 @@ async function sendAnswer(raw,automatic=false,kind='answer'){
   const reply=await Api.question(pending.questionId,'answer',{
    raw:pending.raw,automatic:pending.automatic,kind:pending.kind,runId:saved.runId
   });
-  cityLookupPending=false;finalize(reply.result);
+  cityLookupPending=false;finalize(reply.result,reply.counted===true);
  }catch(error){
   cityLookupPending=false;
   const dayChanged=error.status===409||['DAY_CHANGED','QUESTION_NOT_TODAY','NO_DAILY_GAME'].includes(error.code);
@@ -271,7 +331,10 @@ function boundaryRange(q,b){const v=b.max_gap_inclusive;if(v===null)return 'Outs
 function scoreZoneHTML(){return TIERS.map(t=>`<div class="zone ${feedback?.points===t.points?'active':''}"><b>${t.short}</b><span>${t.name}</span></div>`).join('')}
 function cardNav(){return `<div class="card runs-card"><div class="card-head"><span>TODAY'S SIX</span><span>⌁ ${String(dayNum).padStart(3,'0')} / ${availableDays.length}</span></div><div class="run-list">${questions().map((q,i)=>{let answer=curProgress().responses[i];return `<div class="run-row ${answer?'completed':i===round&&phase!=='end'?'current':''}"><span class="n">${answer?'✓':String(i+1).padStart(3,'0')}</span>${escapeHTML(CATEGORIES[q.topic]||String(q.topic||'').toUpperCase())}<small>${answer?answer.points:'—'}</small></div>`}).join('')}</div></div>`}
 function sideHTML(){const attempts=curProgress().responses.filter(Boolean).length;return `<aside class="sidebar">${cardNav()}<div class="card scorepanel"><div><div class="micro">YOUR SCORE SO FAR</div><div class="big">${formatScore(scoreSoFar())}<span> / ${formatScore(MAX)}</span></div><div class="micro">${attempts} of 6 locked</div></div><div class="meter"><div style="width:${scoreSoFar()/MAX*100}%"></div></div></div><div class="card rules-mini"><h4>TWO RULES</h4><p>Only entities matching the question’s scope qualify. Then ONE direction per question: AT MOST ↑ or AT LEAST ↓. The other side scores zero. An exact hit earns 1,200. 30 seconds, free-text answers.</p></div></aside>`}
-function introHTML(){return `<div class="start-screen"><div class="launch-copy"><div class="start-kicker"><span class="sparkmark">✳</span> DAILY CHALLENGE <span class="intro-number">#${String(dayNum).padStart(3,'0')}</span></div><h2>HOW CLOSE<br>CAN YOU GET?</h2><p>Six questions. No multiple choice. See how close you can get.</p><button class="cta big main-play" id="startBtn">${curProgress().responses.filter(Boolean).length?'CONTINUE GAME':'LET’S PLAY'} <span aria-hidden="true">↗</span></button><button class="intro-rules" data-modal="rules">HOW TO PLAY <span aria-hidden="true">↗</span></button></div><aside class="launch-guide" aria-label="The daily challenge in numbers"><div class="launch-guide-title"><span>YOUR DAILY DOSE<br>OF ODDLY SPECIFIC.</span><b aria-hidden="true">✳</b></div><div class="launch-stat"><strong>06</strong><span>UNEXPECTED QUESTIONS<small>One answer. Your call.</small></span></div><div class="launch-stat"><strong>${roundTimeLimit()}<small>s</small></strong><span>FOR EACH ANSWER<small>Get close. Watch the direction.</small></span></div><div class="launch-stat"><strong>7200</strong><span>POINTS TO CHASE<small>Six perfect hits. Can you?</small></span></div></aside></div>`}
+function introHTML(){
+ // An older server-confirmed completion has no answer catalogue, but still has an official chart.
+ if(REMOTE.counted&&!REMOTE.progress&&!curProgress().completed)return `<div class="end-screen"><div class="end-dashboard legacy-end-dashboard"><section class="run-summary"><div class="ribbon">✹ THE RUN IS DONE</div><h2>ALREADY COMPLETED.</h2><div class="end-score">${formatScore(REMOTE.officialScore)}<small> / 7200</small></div><p>Your result is counted on the server. This older completion has no recoverable round-by-round breakdown, and this day cannot be replayed.</p><div class="btnrow"><button class="cta ghost" data-modal="archive">MY DAYS</button></div></section>${dailyStatsHTML()}</div></div>`;
+ return `<div class="start-screen"><div class="launch-copy"><div class="start-kicker"><span class="sparkmark">✳</span> DAILY CHALLENGE <span class="intro-number">#${String(dayNum).padStart(3,'0')}</span></div><h2>HOW CLOSE<br>CAN YOU GET?</h2><p>Six questions. No multiple choice. See how close you can get.</p><button class="cta big main-play" id="startBtn">${curProgress().responses.filter(Boolean).length?'CONTINUE GAME':'LET’S PLAY'} <span aria-hidden="true">↗</span></button><button class="intro-rules" data-modal="rules">HOW TO PLAY <span aria-hidden="true">↗</span></button></div><aside class="launch-guide" aria-label="The daily challenge in numbers"><div class="launch-guide-title"><span>YOUR DAILY DOSE<br>OF ODDLY SPECIFIC.</span><b aria-hidden="true">✳</b></div><div class="launch-stat"><strong>06</strong><span>UNEXPECTED QUESTIONS<small>One answer. Your call.</small></span></div><div class="launch-stat"><strong>${roundTimeLimit()}<small>s</small></strong><span>FOR EACH ANSWER<small>Get close. Watch the direction.</small></span></div><div class="launch-stat"><strong>7200</strong><span>POINTS TO CHASE<small>Six perfect hits. Can you?</small></span></div></aside></div>`}
 function arenaHTML(){const q=currentQ();return `<div class="arena-top"><div class="roundbadge">ROUND ${String(round+1).padStart(2,'0')} / 06 &nbsp; • &nbsp; ${escapeHTML(CATEGORIES[q.topic]||String(q.topic||'').toUpperCase())}</div><div class="clock-box run-total">${formatScore(scoreSoFar())}<small> / 7200 PTS</small></div></div><div class="arena-content"><div class="round-track" aria-label="Round ${round+1} of 6">${Array.from({length:6},(_,i)=>`<span class="${i<round?'done':i===round?'active':''}" ${i===round?'aria-current="step"':''}>${String(i+1).padStart(2,'0')}</span>`).join('')}</div><div class="question-stage"><div class="question-copy"><div class="topic-label">${escapeHTML(CATEGORIES[q.topic]||String(q.topic||'').toUpperCase())} / KNOW YOUR LIMIT</div><h2 class="question-title">${escapeHTML(displayPrompt(q))}</h2><div class="edge-direction ${q.direction==='above'?'from-above':''}" aria-label="${q.direction==='above'?'Approach only from above':'Approach only from below'}"><span class="arrow">${directionArrow(q)}</span><span>${directionalRule(q)}</span></div></div><div class="limitpanel"><small>${directionText(q)} THE TARGET &nbsp; / &nbsp; EXACT MATCH = 1200 PTS</small><strong class="limit-value ${String(displayMeasure(q,q.limit)).length>=8?'limit-long':''}">${displayMeasure(q,q.limit)}<span class="inline-unit">${escapeHTML(unitLabel(q))}</span></strong><div class="score-range-hint">SCORE WINDOW: within ${displayDistance(q,q.scoring_window.max_scoring_distance)} ${escapeHTML(unitLabel(q))} from this limit. Farther = 0 pts. </div></div></div><div class="edge-composer"><label class="input-title" for="guess">YOUR ANSWER</label><div class="edge-entrybar"><form id="answerForm" autocomplete="off"><div class="input-wrap"><div class="guess-shell"><input class="textinput" id="guess" maxlength="${q.input_max_length||115}" autocomplete="off" spellcheck="false" aria-describedby="resolvedHint" placeholder="Type an answer..." value="${escapeHTML(inputValue)}"><div class="guess-ghost" id="guessGhost" aria-hidden="true"></div></div><button type="submit" id="submitGuess" class="cta dark">CONFIRM ↵</button></div></form><div class="edge-timer-near" id="nearClock"><small>TIME</small><strong id="clock">${String(timerRemaining()).padStart(2,'0')}s</strong></div></div><div id="resolvedHint" class="typehint" style="display:none;margin-top:7px"></div><div class="notice" id="notice" role="status" style="display:${warning?'block':'none'}">${escapeHTML(warning)}</div><div class="inline-actions"><span class="typehint">⌁ ALIASES RECOGNIZED</span><button class="quiet" id="skipBtn">SKIP → 0</button></div></div><div class="footnote"><a href="${escapeHTML(q.source||'#')}" target="_blank" rel="noopener noreferrer">Dataset source ↗</a></div></div>`}
 function exactCutoffs(q){return `<details class="scorebreak"><summary>SHOW SCORE BANDS +</summary><div class="cutoffrow"><b>1200 PTS</b><span>EXACTLY ${displayMeasure(q,q.limit)} ${escapeHTML(unitLabel(q))}</span></div>${q.score_bands.map((b,i)=>{let prev=i===0?0:q.score_bands[i-1].max_gap_inclusive;let sign=q.direction==='above'?'+':'−';const range=b.max_gap_inclusive===null?`Distance > ${displayDistance(q,prev)}`:`Distance > ${displayDistance(q,prev)} to ${displayDistance(q,b.max_gap_inclusive)}`;return `<div class="cutoffrow"><b>${b.points} PTS</b><span>${range} ${escapeHTML(unitLabel(q))} (${sign} from target)</span></div>`}).join('')}<div class="cutoffrow"><b>0 PTS</b><span>Wrong side of target OR farther than ${displayDistance(q,q.score_bands.at(-1).max_gap_inclusive)} ${escapeHTML(unitLabel(q))} from the limit</span></div></details>`}
 function revealHTML(){
@@ -371,6 +434,13 @@ function summaryTier(r){
  const zeroLabels={far:'TOO FAR',over:'CROSSED LIMIT',skipped:'SKIPPED',timeout:'TIME OUT',review:'NEEDS REVIEW',invalid:'INELIGIBLE',unverified:'NO VERIFIED DATA'};
  return zeroLabels[r.kind]||'NO SCORE';
 }
+function requestChartSnapshotOnce(){
+ if(chartSnapshotRequested)return;
+ chartSnapshotRequested=true;
+ if(Stats.state(BOOT.date).data)return; // An outstanding receipt sync may have supplied the snapshot already.
+ if(completedCountedByServer)Stats.refresh(BOOT.date,BOOT.revision);
+ else Stats.complete(curProgress()); // Legacy signed runs still need a one-time submission.
+}
 function endHTML(){const results=curProgress().responses;return `<div class="end-screen"><div class="end-dashboard"><section class="run-summary"><div class="ribbon">✹ THE RUN IS DONE</div><h2>THAT WAS CLOSEISH.</h2><div class="end-score">${formatScore(scoreSoFar())}<small> / ${formatScore(MAX)}</small></div><div class="end-rows" aria-label="Point category, your answer, and earned points for each question">${questions().map((q,i)=>{const r=results[i];return `<div class="end-row"><span class="index">Q${i+1}</span><div class="end-row-detail"><strong class="tier">${escapeHTML(summaryTier(r))}</strong><div class="end-row-meta"><span class="end-row-answer">${escapeHTML(answerName(r))}</span><span class="end-row-points">${formatScore(r?.points??0)} pts</span></div></div></div>`}).join('')}</div><div class="btnrow"><button class="cta" id="shareBtn">COPY RESULTS ↗</button><button class="cta ghost" data-modal="archive">MY DAYS</button></div></section>${dailyStatsHTML()}${answerCataloguePanelHTML()}</div></div>`}
 
 function calendarHTML(){
@@ -383,7 +453,7 @@ function calendarHTML(){
   const status=done?'DONE':partial?`${saved.responses?.filter(Boolean).length||0}/6`:installed?'MISSED':iso>BOOT.date?'FUTURE':'—';
   cells.push(`<button class="cal-day ${done?'cal-completed':today?'cal-selected':'cal-upcoming'}" ${today?`data-day="${dayNum}"`:'disabled'} aria-label="${iso}: ${status}"><span class="cal-date">${d}</span><small>${today&&!done&&!partial?'TODAY':status}</small>${done?'<span class="cal-check">✓</span>':''}</button>`);
  }
- return `<div class="closeish-calendar"><div class="cal-top"><button class="cal-nav" data-cal-step="-1" aria-label="Previous month">‹</button><div class="cal-heading">${name}<small>${escapeHTML(BOOT.timezone)}</small></div><button class="cal-nav" data-cal-step="1" aria-label="Next month">›</button></div><div class="cal-weekdays">${['MON','TUE','WED','THU','FRI','SAT','SUN'].map(n=>`<span>${n}</span>`).join('')}</div><div class="cal-grid">${cells.join('')}</div><p class="typehint">Only today’s game is playable. Past progress stays on this device. 2/6 means two answers are locked; DONE means all six are complete.</p></div>`;
+ return `<div class="closeish-calendar"><div class="cal-top"><button class="cal-nav" data-cal-step="-1" aria-label="Previous month">‹</button><div class="cal-heading">${name}<small>${escapeHTML(BOOT.timezone)}</small></div><button class="cal-nav" data-cal-step="1" aria-label="Next month">›</button></div><div class="cal-weekdays">${['MON','TUE','WED','THU','FRI','SAT','SUN'].map(n=>`<span>${n}</span>`).join('')}</div><div class="cal-grid">${cells.join('')}</div><p class="typehint">Only today’s game is playable. Past progress is saved in your player account on the game server. 2/6 means two answers are locked; DONE means all six are complete.</p></div>`;
 }
 let bookRound=0;
 let answerBookOpen=null;
@@ -413,9 +483,11 @@ document.addEventListener('keydown',event=>{
 });
 
 function unavailableHTML(){return `<div class="start-screen"><div class="start-kicker">DAILY CHALLENGE</div><h2>NOT AVAILABLE<br>YET.</h2><p>No question set is published for today. Your previous progress is saved. Come back when a new daily game is published.</p><button class="cta big" data-modal="archive">OPEN MY DAYS ↗</button></div>`}
-function render(){document.body.classList.toggle('edge-ended',phase==='end');document.body.classList.toggle('edge-playing',phase==='play');document.body.classList.toggle('edge-run',phase!=='intro');document.body.classList.toggle('edge-intro',phase==='intro');const p=curProgress();if(phase==='intro'&&p.completed)phase='end';const inner=!dayPack()?unavailableHTML():phase==='intro'?introHTML():phase==='play'?arenaHTML():phase==='reveal'?revealHTML():endHTML();el.innerHTML=`<header class="topbar"><div class="top-inner"><button class="logo" id="homeBtn" type="button" aria-label="${phase==='play'||phase==='reveal'?'Home navigation unavailable during the challenge':'CLOSEISH home'}" ${phase==='play'||phase==='reveal'?'disabled title="Finish all six rounds to return home"':''}>CLOSE<span class="period">ISH</span><svg viewBox="0 0 28 28" aria-hidden="true"><path fill="#ff6a55" stroke="#19151f" stroke-width="2" d="M14 1L18 9 27 7 22 15 27 23 17 21 13 28 10 19 1 20 6 13 2 5 11 9Z"/></svg></button><nav class="mainnav" aria-label="Main navigation">${unitControlHTML()}<button class="navbutton navsuggest" data-modal="suggest">SUGGEST +</button><button class="navbutton" data-modal="rules">HOW TO PLAY</button><button class="navbutton navarchive" data-modal="archive">MY DAYS ↗</button></nav></div></header><div class="ticker"><span>${('✳ KNOW IT. RISK IT. NAIL IT. &nbsp;&nbsp;&nbsp; ✳ ANY TOPIC. ONE LIMIT. &nbsp;&nbsp;&nbsp; ✳ NO GUESSING FROM A LIST. &nbsp;&nbsp;&nbsp; ').repeat(9)}</span></div><section class="hero"><div class="hero-inner"><div class="hero-copy"><div class="eyebrow"><i class="line"></i> THE DAILY GAME OF LIMITS</div><h1>CLOSE<span>ISH</span></h1><p class="hero-sub">Know something weird? <em>Put it on the line.</em></p></div><div class="hero-art" aria-hidden="true"><div class="art-panel"><div class="art-limit"></div><div class="art-label">THE LIMIT</div><svg class="art-line" viewBox="0 0 250 160"><polyline points="5,138 42,118 81,127 116,85 151,98 183,43 211,64 240,12"/><circle cx="240" cy="12" r="11"/></svg></div><div class="art-sticker">CLOSE<br>CALL!</div></div></div></section><div class="breakline">★ <b>THINK HARD</b> ★ <b>GO BIG</b> ★ <b>CHECK THE DIRECTION</b> ★ <b>COME BACK TOMORROW</b> ★</div><main class="shell content"><div class="section-head"><div><div class="micro">THE DAILY CHALLENGE</div></div><div class="day-badge">${dayPack()?'CHALLENGE #'+String(dayNum).padStart(3,'0'):BOOT.date}</div></div><div class="playgrid"> <section class="card maincard" id="gameArea">${inner}</section></div></main><footer class="shell footer"><strong>CLOSEISH / KNOW YOUR LIMITS.</strong><span>Wildly specific limits. Free-text answers. No ads.</span></footer>${modalHTML()}`;
+function render(){const retainedChart=document.querySelector('.end-screen .mock-stat-card');const legacyCompletion=phase==='intro'&&REMOTE.counted&&!REMOTE.progress&&!curProgress().completed;document.body.classList.toggle('edge-ended',phase==='end'||legacyCompletion);document.body.classList.toggle('edge-playing',phase==='play');document.body.classList.toggle('edge-run',phase!=='intro');document.body.classList.toggle('edge-intro',phase==='intro');const p=curProgress();if(phase==='intro'&&p.completed)phase='end';const inner=!dayPack()?unavailableHTML():phase==='intro'?introHTML():phase==='play'?arenaHTML():phase==='reveal'?revealHTML():endHTML();el.innerHTML=`<header class="topbar"><div class="top-inner"><button class="logo" id="homeBtn" type="button" aria-label="${phase==='play'||phase==='reveal'?'Home navigation unavailable during the challenge':'CLOSEISH home'}" ${phase==='play'||phase==='reveal'?'disabled title="Finish all six rounds to return home"':''}>CLOSE<span class="period">ISH</span><svg viewBox="0 0 28 28" aria-hidden="true"><path fill="#ff6a55" stroke="#19151f" stroke-width="2" d="M14 1L18 9 27 7 22 15 27 23 17 21 13 28 10 19 1 20 6 13 2 5 11 9Z"/></svg></button><nav class="mainnav" aria-label="Main navigation">${unitControlHTML()}<button class="navbutton navsuggest" data-modal="suggest">SUGGEST +</button><button class="navbutton" data-modal="rules">HOW TO PLAY</button><button class="navbutton navarchive" data-modal="archive">MY DAYS ↗</button></nav></div></header><div class="ticker"><span>${('✳ KNOW IT. RISK IT. NAIL IT. &nbsp;&nbsp;&nbsp; ✳ ANY TOPIC. ONE LIMIT. &nbsp;&nbsp;&nbsp; ✳ NO GUESSING FROM A LIST. &nbsp;&nbsp;&nbsp; ').repeat(9)}</span></div><section class="hero"><div class="hero-inner"><div class="hero-copy"><div class="eyebrow"><i class="line"></i> THE DAILY GAME OF LIMITS</div><h1>CLOSE<span>ISH</span></h1><p class="hero-sub">Know something weird? <em>Put it on the line.</em></p></div><div class="hero-art" aria-hidden="true"><div class="art-panel"><div class="art-limit"></div><div class="art-label">THE LIMIT</div><svg class="art-line" viewBox="0 0 250 160"><polyline points="5,138 42,118 81,127 116,85 151,98 183,43 211,64 240,12"/><circle cx="240" cy="12" r="11"/></svg></div><div class="art-sticker">CLOSE<br>CALL!</div></div></div></section><div class="breakline">★ <b>THINK HARD</b> ★ <b>GO BIG</b> ★ <b>CHECK THE DIRECTION</b> ★ <b>COME BACK TOMORROW</b> ★</div><main class="shell content"><div class="section-head"><div><div class="micro">THE DAILY CHALLENGE</div></div><div class="day-badge">${dayPack()?'CHALLENGE #'+String(dayNum).padStart(3,'0'):BOOT.date}</div></div><div class="playgrid"> <section class="card maincard" id="gameArea">${inner}</section></div></main><footer class="shell footer"><strong>CLOSEISH / KNOW YOUR LIMITS.</strong><span>Wildly specific limits. Free-text answers. No ads.</span></footer>${modalHTML()}`;
+ // An overlay, navigation, or archive refresh must not redraw or restart the chart.
+ if(retainedChart&&(phase==='end'||legacyCompletion))document.querySelector('.end-screen .mock-stat-card')?.replaceWith(retainedChart);
  bindUnitControl();
- document.getElementById('homeBtn')?.addEventListener('click',()=>{if(phase==='play'||phase==='reveal')return;stopClock();answerBookOpen=null;catalogueLockedHeight=null;phase=curProgress().completed?'end':'intro';render()});document.querySelectorAll('[data-modal]').forEach(b=>b.addEventListener('click',()=>{modalTrigger=`[data-modal="${b.dataset.modal}"]`;showModal=b.dataset.modal;if(showModal==='rules')globalThis.CLOSEISHCommunity.resetGuide();if(showModal==='archive')archiveMonthIndex=0;render()}));document.getElementById('closeModal')?.addEventListener('click',closeOverlay);document.getElementById('modalWrap')?.addEventListener('mousedown',e=>{if(e.target.id==='modalWrap')closeOverlay()});document.querySelectorAll('[data-cal-step]').forEach(b=>b.addEventListener('click',()=>{archiveMonthIndex+=Number(b.dataset.calStep);render()}));document.querySelectorAll('[data-day]').forEach(b=>b.addEventListener('click',()=>{showModal=null;showDay(+b.dataset.day)}));
+ document.getElementById('homeBtn')?.addEventListener('click',()=>{if(phase==='play'||phase==='reveal')return;stopClock();answerBookOpen=null;catalogueLockedHeight=null;phase=curProgress().completed?'end':'intro';render()});document.querySelectorAll('[data-modal]').forEach(b=>b.addEventListener('click',()=>{modalTrigger=`[data-modal="${b.dataset.modal}"]`;showModal=b.dataset.modal;if(showModal==='rules')globalThis.CLOSEISHCommunity.resetGuide();if(showModal==='archive'){archiveMonthIndex=0;loadArchiveMonth()}render()}));document.getElementById('closeModal')?.addEventListener('click',closeOverlay);document.getElementById('modalWrap')?.addEventListener('mousedown',e=>{if(e.target.id==='modalWrap')closeOverlay()});document.querySelectorAll('[data-cal-step]').forEach(b=>b.addEventListener('click',()=>{archiveMonthIndex+=Number(b.dataset.calStep);loadArchiveMonth();render()}));document.querySelectorAll('[data-day]').forEach(b=>b.addEventListener('click',()=>{showModal=null;showDay(+b.dataset.day)}));
  document.getElementById('startBtn')?.addEventListener('click',()=>{let saved=curProgress();if(saved.completed){phase='end';render();return}if(Number.isInteger(saved.activeRound)&&saved.activeDeadline){round=saved.activeRound;deadline=saved.activeDeadline;restoreDraft(saved);phase='play';render();if(timerRemaining()<=0)timeoutRound();else startClock();return}round=saved.responses.findIndex(x=>!x);if(round<0)round=saved.responses.length||0;playRound()});document.getElementById('answerForm')?.addEventListener('submit',e=>{e.preventDefault();submitAnswer()});
  const field=document.getElementById('guess');if(field){field.addEventListener('input',updateHints);if(inputValue){activeHints=candidateMatches(currentQ(),inputValue);refreshInlineHint()}}
  document.getElementById('skipBtn')?.addEventListener('click',skipRound);document.getElementById('nextBtn')?.addEventListener('click',nextRound);document.getElementById('reviewBtn')?.addEventListener('click',submitReview);document.getElementById('shareBtn')?.addEventListener('click',share);
@@ -426,17 +498,35 @@ function render(){document.body.classList.toggle('edge-ended',phase==='end');doc
  if(showModal==='suggest')globalThis.CLOSEISHCommunity.bindSuggestion();
  if(showModal==='rules')globalThis.CLOSEISHCommunity.bindGuide(render,closeOverlay);
  if(showModal)document.getElementById('closeModal')?.focus();
+ if((phase==='end'&&curProgress().completed)||legacyCompletion)requestChartSnapshotOnce();
 }
 async function share(){const p=curProgress(),score=scoreSoFar();const grid=p.responses.map(r=>r.points===1200?'🟪':r.points===1000?'🟩':r.points>=600?'🟦':r.points>=200?'🟨':'⬛').join('');let text=`CLOSEISH #${String(dayNum).padStart(3,'0')} — ${score}/${MAX}\n${grid}\nSix rounds. One edge.`;try{await navigator.clipboard.writeText(text);let b=document.getElementById('shareBtn');if(b)b.textContent='COPIED ✓'}catch{prompt('Copy your results:',text)}}
 function restore(){
  if(!dayPack()){phase='intro';render();return}
  const saved=curProgress();
  if(!Array.isArray(saved.responses)||saved.responses.length>6){delete allProgress[progressKey()];phase='intro';render();return}
- if(saved.completed){phase='end';render();Stats.complete(saved);return}
+ if(saved.completed){phase='end';render();return}
  if(saved.pendingSubmission){round=saved.pendingSubmission.round;deadline=saved.activeDeadline;restoreDraft(saved);phase='play';render();sendAnswer(saved.pendingSubmission.raw,saved.pendingSubmission.automatic,saved.pendingSubmission.kind);return}
  if(Number.isInteger(saved.activeRound)&&saved.activeRound>=0&&saved.activeRound<6&&saved.activeDeadline){round=saved.activeRound;deadline=saved.activeDeadline;restoreDraft(saved);phase='play';render();if(timerRemaining()<=0)timeoutRound();else startClock();return}
- if(saved.phase==='reveal'&&saved.responses[saved.lastRound]){round=saved.lastRound;feedback=saved.responses[round];phase='reveal';render();return}
+ if(saved.phase==='reveal'&&saved.responses.length){round=Number.isInteger(saved.lastRound)?saved.lastRound:saved.responses.length-1;feedback=saved.responses[round];phase='reveal';render();return}
  phase='intro';render();
+}
+// One-time best-effort import of signed V17 history, without trusting browser scores.
+// Older unsigned runs and expired receipts cannot be independently verified.
+async function importLegacyProgress(){
+ const historic=stored(STORAGE,{}),original=stored(ORIGINAL,{});
+ const merged={...historic,...original};let allImported=true;
+ for(const [key,old] of Object.entries(merged)){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(key)||!old?.responses?.length)continue;
+  if(old.migrated||!old.responses.every(r=>r?.receipt)||!old.runId||!old.revision){allImported=false;continue}
+  if(key===BOOT.date&&REMOTE.progress?.completed)continue;
+  try{
+   const result=await Api.post('/api/v1/progress/import',{playerId:Api.playerId,date:key,
+     revision:old.revision,runId:old.runId,responses:old.responses});
+   if(key===BOOT.date&&result.progress){allProgress[key]=result.progress;restore()}
+  }catch(error){allImported=false;console.warn('[CLOSEISH] Legacy game kept in browser (cannot verify):',key,error?.code||error?.message)}
+ }
+ if(allImported){try{localStorage.removeItem(STORAGE);localStorage.removeItem(ORIGINAL);localStorage.removeItem('closeish-today-cache-v1');localStorage.removeItem(REVIEW)}catch{}}
 }
 // The statistics panel is replaced after server refreshes: event delegation survives.
 document.addEventListener('click',event=>{
@@ -447,6 +537,5 @@ window.addEventListener('closeish-statistics',()=>{
  const panel=document.querySelector('.end-screen .mock-stat-card');
  if(panel){const holder=document.createElement('div');holder.innerHTML=dailyStatsHTML();panel.replaceWith(holder.firstElementChild);}
 });
-setInterval(()=>{if(!document.hidden&&curProgress().completed)Stats.refresh(BOOT.date,BOOT.revision)},30000);
-saveProgress();restore();
+saveProgress();restore();importLegacyProgress();
 })();

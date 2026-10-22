@@ -8,3 +8,19 @@
   Cache-Control: no-store
 /*
   X-Content-Type-Options: nosniff
+
+# Versioned static assets may be cached; index/config are always revalidated.
+/api.js
+  Cache-Control: public, max-age=604800
+/view-core.js
+  Cache-Control: public, max-age=604800
+/community.js
+  Cache-Control: public, max-age=604800
+/score-chart.js
+  Cache-Control: public, max-age=604800
+/statistics-client.js
+  Cache-Control: public, max-age=604800
+/game.js
+  Cache-Control: public, max-age=604800
+/style.css
+  Cache-Control: public, max-age=604800

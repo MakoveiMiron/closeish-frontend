@@ -26,10 +26,8 @@ function makeResponse(data,status=200,extra={}){
 }
 const fetch=async (url,opts)=>{
  reqs.push({url,opts});
- if(url.endsWith('/today')){
-  if(opts.headers.get('If-None-Match')==='"revision-1"')return makeResponse(null,304,{'ETag':'"revision-1"'});
-  return makeResponse(BOOT,200,{'ETag':'"revision-1"'});
- }
+ if(url.endsWith('/today'))return makeResponse(BOOT,200,{'ETag':'"revision-1"'});
+ if(url.includes('/progress?'))return makeResponse({date:BOOT.date,progress:null,days:[],month:'2026-10',counted:false});
  if(url.includes('/hints?'))return makeResponse({candidates:[]});
  if(url.endsWith('/answer'))return makeResponse({result:{points:200,receipt:'signed'}});
  if(url.endsWith('/statistics'))return makeResponse({statistics:{total:0,histogram:[]}});
@@ -48,7 +46,9 @@ assert.ok(global.CLOSEISHApi);
 assert.match(global.CLOSEISHApi.playerId,/^[0-9a-f-]{36}$/i);
 const cached=await global.CLOSEISHApi.getToday();
 assert.equal(cached.revision,revision);
-assert.ok(reqs.some(r=>r.opts.headers.get('If-None-Match')==='"revision-1"'));
+assert.ok(reqs.some(r=>r.url.endsWith('/today')&&r.opts.cache==='no-cache'));
+assert.equal(store.has('closeish-today-cache-v1'),false);
+assert.ok(reqs.some(r=>r.url.includes('/progress?')));
 await global.CLOSEISHApi.question('a-b','hints',{q:'abc'});
 await global.CLOSEISHApi.question('a-b','answer',{raw:'example',kind:'answer',runId:crypto.randomUUID()});
 const sent=reqs.find(r=>r.url.endsWith('/answer'));
@@ -97,15 +97,14 @@ assert.ok(saved.outbox[0].retryAt>Date.now());
 saved.outbox[0].retryAt=0;store.set('closeish-statistics-v1',JSON.stringify(saved));
 stats=startStats();
 await new Promise(r=>setTimeout(r,15));
-saved=JSON.parse(store.get('closeish-statistics-v1'));
+saved=store.get('closeish-statistics-v1');
 assert.equal(submissions,2);
-assert.equal(saved.outbox.length,0);
-assert.equal(saved.accepted.length,1);
+assert.equal(saved,undefined,'No synchronized results are duplicated in localStorage');
 assert.equal(stats.CLOSEISHStats.state(BOOT.date).data.total,1);
 // An old unsigned V16 progress may be displayed locally, but never becomes an official result.
 stats.CLOSEISHStats.complete({...progress,date:'2026-10-21',revision:'legacy',migrated:true,runId:null,
  responses:Array.from({length:6},()=>({points:1200}))});
 await new Promise(r=>setTimeout(r,5));
 assert.equal(submissions,2);
-console.log(JSON.stringify({passed:true,etag304:true,conditionalApiKey:true,jsonPost:true,rateLimitRetryAfter:true,
+console.log(JSON.stringify({passed:true,browserHttpCache:true,conditionalApiKey:true,jsonPost:true,rateLimitRetryAfter:true,
   signedOutboxSurvivesReload:true,transient503Retried:true,legacyUnsignedRejected:true},null,2));

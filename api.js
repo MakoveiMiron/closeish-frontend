@@ -3,7 +3,7 @@
 const cfg=globalThis.CLOSEISH_CONFIG||{};
 const base=String(cfg.apiBase||'').replace(/\/+$/,'');
 const apiKey=typeof cfg.apiKey==='string'?cfg.apiKey:'';
-const TODAY_CACHE='closeish-today-cache-v1';
+const TODAY_CACHE='closeish-today-cache-v1'; // legacy cache removed below
 const UUID_V4=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 // randomUUID() needs HTTPS in many browsers. getRandomValues() also works over HTTP.
 // Do not downgrade to Math.random(): both playerId and runId must be UUID v4.
@@ -28,7 +28,7 @@ function storageWarning(){
  const notice=document.getElementById('storageNotice');
  if(!notice)return;
  notice.hidden=false;
- notice.textContent='Browser storage is unavailable. Progress may be lost when this tab closes.';
+ notice.textContent='Browser storage is unavailable. Unsynced input may be lost when this tab closes.';
 }
 function parseRetryAfter(header){
  if(!header)return 0;
@@ -44,7 +44,7 @@ async function transport(path,{headers:extraHeaders={},...options}={}){
  let response;
  try{
   response=await fetch(base+path,{
-   ...options,headers,credentials:'omit',cache:'no-store',signal:AbortSignal.timeout(12000)
+   ...options,headers,credentials:'omit',cache:options.method==='POST'?'no-store':'no-cache',signal:AbortSignal.timeout(12000)
   });
  }catch(err){
   const error=new Error(err?.name==='TimeoutError'?'API request timed out.':'Unable to reach the API.');
@@ -71,31 +71,17 @@ async function request(path,options){
  return data;
 }
 function post(path,data){return request(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})}
-function readCachedToday(){
- try{
-  const cached=JSON.parse(localStorage.getItem(TODAY_CACHE));
-  return cached&&cached.data&&typeof cached.data.date==='string'&&typeof cached.etag==='string'?cached:null;
- }catch{return null}
-}
 async function getToday(){
- const cached=readCachedToday();
- const headers=cached?{'If-None-Match':cached.etag}:{};
- let result=await transport('/api/v1/today',{headers});
- // A 304 is useful only with a locally preserved exact copy.
- if(result.status===304){
-  if(cached)return cached.data;
-  result=await transport('/api/v1/today');
- }
- if(!result.data||typeof result.data.date!=='string'||typeof result.data.revision!=='string'){
-  throw new Error('Invalid daily challenge response');
- }
- const etag=result.headers.get('ETag');
- if(etag){
-  try{localStorage.setItem(TODAY_CACHE,JSON.stringify({etag,data:result.data}))}catch{storageWarning()}
- }else{
-  try{localStorage.removeItem(TODAY_CACHE)}catch{}
- }
- return result.data;
+ const data=await request('/api/v1/today');
+ if(!data||typeof data.date!=='string'||typeof data.revision!=='string'&&data.available)throw new Error('Invalid daily challenge response');
+ // The browser HTTP cache, governed by the backend ETag, handles validation.
+ // The daily question payload is NOT duplicated into localStorage.
+ try{localStorage.removeItem(TODAY_CACHE)}catch{}
+ return data;
+}
+async function getProgress(month){
+ const params=new URLSearchParams({playerId});if(month)params.set('month',month);
+ return request('/api/v1/progress?'+params);
 }
 function question(id,action,fields={}){
  if(!['hints','answer','catalogue'].includes(action))throw new Error('Unsupported question API action');
@@ -104,16 +90,17 @@ function question(id,action,fields={}){
  return action==='answer'?post(path,data):request(path+'?'+new URLSearchParams(data));
 }
 function loadScript(src){return new Promise((resolve,reject)=>{
- const script=document.createElement('script');script.src=src+'?v=17.4';script.onload=resolve;script.onerror=reject;document.head.appendChild(script);
+ const script=document.createElement('script');script.async=false;script.src=src+'?v=17.5.1';script.onload=resolve;script.onerror=reject;document.head.appendChild(script);
 })}
 async function start(){
  if(started)return;
  started=true;
  try{
-  boot=await getToday();globalThis.CLOSEISH_BOOT=boot;
+  const [today,remote]=await Promise.all([getToday(),getProgress()]);
+  boot=today;globalThis.CLOSEISH_BOOT=boot;globalThis.CLOSEISH_REMOTE_PROGRESS=remote;
   try{localStorage.setItem('closeish-storage-check','1');localStorage.removeItem('closeish-storage-check')}catch{storageWarning()}
-  globalThis.CLOSEISHApi={question,storageWarning,post,playerId,getToday,newUuidV4};
-  for(const file of ['/view-core.js','/community.js','/score-chart.js','/statistics-client.js','/game.js'])await loadScript(file);
+  globalThis.CLOSEISHApi={question,storageWarning,post,playerId,getToday,getProgress,newUuidV4};
+  await Promise.all(['/view-core.js','/community.js','/score-chart.js','/statistics-client.js','/game.js'].map(loadScript));
   let checking=false;
   async function checkDate(){
    if(document.hidden||checking)return;
@@ -127,7 +114,7 @@ async function start(){
     }
    }catch{}finally{checking=false}
   }
-  setInterval(checkDate,60000);document.addEventListener('visibilitychange',checkDate);
+  setInterval(checkDate,300000);document.addEventListener('visibilitychange',checkDate);
  }catch(error){
   console.error('[CLOSEISH] Unable to start:',error);
   started=false;

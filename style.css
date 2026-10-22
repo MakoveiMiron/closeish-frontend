@@ -1173,3 +1173,7 @@ body.edge-playing .edge-entrybar .guess-shell .textinput{font-size:20px}
 body.edge-ended .footer{display:flex!important}
 @media(max-width:520px){.modal-stats .modalcontent{padding:12px}.run-summary .btnrow{gap:9px}.run-summary .btnrow .cta{min-height:45px;padding:11px 10px;font-size:9px}.exact-count-scroll{max-height:64dvh}}
 @media(prefers-reduced-motion:reduce){.boot-orbit,.boot-marker,.boot-progress span{animation:none!important}.boot-orbit.orbit-a{transform:rotate(12deg)}.boot-orbit.orbit-b{transform:rotate(35deg)}}
+
+/* A previously counted legacy day can show its server snapshot even without round details. */
+.legacy-end-dashboard{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)}
+@media(max-width:700px){.legacy-end-dashboard{grid-template-columns:minmax(0,1fr)}}

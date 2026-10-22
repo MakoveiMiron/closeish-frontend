@@ -22,7 +22,7 @@ try{
  page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push({url:r.url(),method:r.method()}));
  await page.goto(base);await page.locator('#startBtn').click();
  assert.equal(await page.locator('#clock').innerText(),'30s');
- const saved=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('closeish-progress-v2'))['2026-10-22']);
+ const saved=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('closeish-pending-v1')));
  const deadline=(await saved()).activeDeadline;
  let marker=requests.length;
  await page.waitForTimeout(3200);const onlineClock=parseInt(await page.locator('#clock').innerText());
@@ -36,7 +36,7 @@ try{
  marker=requests.length;await context.setOffline(true);
  await page.waitForFunction(()=>document.getElementById('clock')?.textContent==='00s',{},{timeout:35000});
  await page.getByRole('button',{name:'RETRY ↗',exact:true}).waitFor();
- const pending=await saved();assert.equal(pending.pendingSubmission.kind,'timeout');assert.equal(pending.responses.length,0);
+ const pending=await saved();assert.equal(pending.pendingSubmission.kind,'timeout');assert.equal(pending.activeRound,0);
  const attempts=requests.slice(marker);assert.equal(attempts.length,1);assert.ok(attempts[0].url.endsWith('/answer'));
  await context.setOffline(false);await page.locator('#nextBtn').waitFor();
  const first=await saved();assert.equal(first.responses[0].kind,'timeout');assert.equal(first.responses[0].points,0);assert.ok(first.responses[0].receipt);
