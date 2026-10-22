@@ -1,45 +1,67 @@
-# CLOSEISH – önálló frontend (V17.1)
+# CLOSEISH – statikus frontend V17.2 / Railway API
 
-Ez a csomag csak a frontendet tartalmazza. A backend külön ZIP és külön futó szolgáltatás. A teljes kérdés- és válaszbank nincs a frontendben.
+A csomag **csak a frontend**: sem a napi válaszlisták, sem a pontozási algoritmus, sem az adatbázis nem található benne. Nincs npm-függőség és buildlépés.
 
-## Helyi indítás
+## Éles publikálás
 
-Node.js 24+ szükséges. Ebben a mappában:
+Másold a webtárhely gyökerébe ezeket: `index.html`, `style.css`, `config.js`, `api.js`, `view-core.js`, `community.js`, `score-chart.js`, `statistics-client.js`, `game.js`. A `_headers` fájlt is másold át, ha a tárhely támogatja az ilyen formátumú válaszfejléceket.
+
+A `config.js` alapértelmezetten a Railway API-ra mutat:
+
+```js
+window.CLOSEISH_CONFIG = {
+  apiBase: 'https://closeish-production.up.railway.app',
+  apiKey: ''
+};
+```
+
+Az `apiBase` origin, nincs a végén `/`. Ugyanazon originen működő `/api/` reverse proxy használatakor az `apiBase` legyen `''`. Ha a backend `API_KEYS` konfigurációt igényel, az **egyébként nyilvánosan látható** `apiKey` megadható, ekkor minden `/api/` kéréshez automatikusan elküldi az `X-API-Key` fejlécet. Ez nem titok, és nem jelent valódi klienshitelesítést. A backend `SIGNING_SECRET`, adatbázis kapcsolati adat és egyéb titok soha nem kerülhet a frontendbe.
+
+A **cross-origin** ETag és `Retry-After` fejlécek JavaScriptből való kiolvasásához a backendnek `Access-Control-Expose-Headers: ETag, Retry-After` fejlécet is vissza kell adnia. Ellenkező esetben az ETag optimalizáció nem működik, a 429-es hibánál pedig a frontend csak óvatos alapértelmezett késleltetést tud alkalmazni. Az `X-API-Key` bekapcsolásakor a CORS preflight `Access-Control-Allow-Headers` listája is engedje ezt a fejlécet.
+
+A backend `ALLOWED_ORIGINS` tartalmazza pontosan a `https://closeish.eu` értéket (záró perjel nélkül). Az `index.html` már tartalmazza a `connect-src 'self' https://closeish-production.up.railway.app` CSP-szabályt; ha a tárhely CSP-fejlécet is küld, az ne írja felül ellentmondásosan.
+
+**Cache:** az `/api/` útvonalakat a CDN, reverse proxy és statikus hosting ne cache-elje (`Cache-Control: no-store`). `index.html` és `config.js`: `no-cache, max-age=0, must-revalidate` vagy szigorúbb. A frontend a napi válasz JSON-t kizárólag a helyi böngészőben tartja meg az ETag/`If-None-Match` → `304` esetére. A script- és CSS-URL-ek verziózottak. A `_headers` csak néhány statikus hoston automatikus; más platformon a szabályokat külön kell megadni.
+
+## Helyi futtatás
+
+Telepítés nélkül:
 
 ```sh
 npm run dev
 ```
 
-Megnyitás: http://localhost:5173
+Megnyitás: `http://localhost:5173`. Node.js szükséges. A `scripts/dev.mjs` csak helyi webszerver, a `/api/` kéréseket alapból a `http://127.0.0.1:3000` címen futó **külön backendhez** proxyzza. `API_PROXY_TARGET` változóval a cél megváltoztatható. Mivel a `config.js` éles Railway-originre mutat, **helyi proxyzáshoz állítsd át átmenetileg `apiBase: ''`-re** (vagy a Railway `ALLOWED_ORIGINS` listába vedd fel a helyi címet a közvetlen API-eléréshez). Ez nem módosítja az éles csomag konfigurációját, hacsak a módosított fájlt nem töltöd fel.
 
-**A frontendhez nem kell npm install.** Nincs csomagfüggősége és buildlépése. A helyi webszerver a `/api/` kéréseket a külön elindított `http://127.0.0.1:3000` backendre továbbítja; nem indítja el helyetted a backendet.
+## Működési szerződés
 
-A másik terminálban, a külön `CLOSEISH-backend` mappában először `npm ci`, majd `npm run demo`. A két mappának nem kell egymás mellett lennie.
+- `GET /api/v1/today` adja az adott Europe/Budapest nap hat kérdését; `available:false` esetén nem kérünk másik napot.
+- A `playerId` egyszeri UUID v4, a `runId` új futásonként új UUID v4 a `localStorage`-ban.
+- A válaszokat (vagy skip/timeout állapotot) külön `POST /api/v1/questions/:id/answer` pontozza; a kliens nem küld pontszámot, hanem eltárolja a szervertől kapott aláírt receiptet.
+- Hat receiptből készül a `POST /api/v1/results` tartós, újraküldhető várólistája. Hálózati hibánál, 429-nél, 503-nál nem feltételezünk sikert; 400-nál véglegesen eltávolítjuk a sorból, és megtartjuk a helyi futást. A 72 órás igazolás-érvényességet a backend vizsgálja.
+- A statisztikai pontértékeket és a `betterThanPercent` mezőt a backend szolgáltatja. A hisztogram 0–7200 között 200 pontos lépésekben, mind a 37 pontos értékkel jelenik meg; a görbe csak vizuálisan simított. A kliens nem számolja újra a százalékot.
+- A 30 másodperces időzítő **csak a böngészőben fut**: abszolút határidő helyi tárolással, nincs szerveres másodperc-tick, nincs WebSocket. Az időzítő frissítés után sem indul újra.
+- Az archivált, V16-os *aláíratlan* eredmény nem hivatalos. Régi napot nem pontozunk újra. A böngészőnkénti azonosító nem csalásbiztos felhasználói rangsor.
+- A korábban befejezett helyi futásról külön eredeti pillanatkép marad a napi gyakorló újrajátszások esetén is. A személyes adatok és eredmények a böngésző eredetén belül maradnak; domainváltás vagy tárolástörlés esetén nem szinkronizálódnak automatikusan.
 
-Másik API-címhez az `API_PROXY_TARGET` környezeti változó állítható. Ez a helyi fejlesztői proxy beállítása. A `WEB_PORT` alapértéke 5173. A backend `ALLOWED_ORIGINS` listája engedélyezze a használt frontend-origint.
+## Tesztelés
 
-## Éles frontend + Railway backend
-
-A statikus tárhelyre az `index.html`, `style.css`, `config.js`, `api.js`, `view-core.js`, `community.js`, `score-chart.js`, `statistics-client.js`, `game.js` fájlok kerüljenek, a webhely gyökerébe. A `scripts/` csak helyi fejlesztői segédlet; éles statikus kiszolgáláshoz nem kell.
-
-A `config.js` fájlban állítsd be a tényleges Railway API HTTPS-originjét:
-
-```js
-window.CLOSEISH_CONFIG={apiBase:'https://SAJAT-BACKEND-DOMAIN'};
+```sh
+node --check api.js
+node --check game.js
+node --check statistics-client.js
 ```
 
-A backenden az `ALLOWED_ORIGINS` a frontend HTTPS-originjét engedélyezze, útvonal és záró perjel nélkül. Ha van CSP, a `connect-src` szabály is engedje az API-t. Az `/api/` proxy használata esetén az `apiBase` maradhat üres.
+Telepítést nem igénylő mockolt API-/várólista-teszt:
 
-## A 30 másodperces számláló
+```sh
+node tests/transport-outbox.mock.mjs
+```
 
-A visszaszámláló **teljes egészében a böngészőben fut**, a `game.js` kezeli. A frontend a kör kezdetén egyszer kiszámítja a határidőt, elmenti helyben, és a saját órájából számolja a hátralévő másodperceket. A backend egyszer adja át a kérdés adataival a 30 másodperces időkeretet; **nem küld másodpercenként hátralévő időt**.
+Opcionális böngészős interakciós teszt (Python Playwright + Chromium szükséges; a teszt közvetlenül `about:blank` oldalba tölti a UI-szkripteket, így nem küld valós API-kérést):
 
-Nincs timer-polling, WebSocket vagy szerveres másodpercüzenet. A számláló internetkimaradás közben is csökken. Frissítés és újranyitás után az eredeti határidő marad, nem jár új 30 másodperc. Időlejáratkor egy normál válasz-/időtúllépés-beküldés történhet; hálózati hiba esetén mentett függő állapotban marad.
+```sh
+python tests/ui.mock.py
+```
 
-A gépelési javaslatok, válaszpontozás és napi statisztika továbbra is API-t használnak. A kész eredményoldal 30 másodperces adatfrissítése és a 60 másodperces napellenőrzés külön funkció, nem a visszaszámláló működtetése.
-
-Az előrehaladás és a teljes eredmények újraküldési várólistája localStorage-ban él, ugyanazon böngészőprofilon és originen. A tárolás törlése vagy a domainváltás a helyi előzmények elvesztésével járhat. A timer helyi kezelése nem csalásbiztos versenyidő-ellenőrzés.
-
-## Ellenőrzés
-
-A külön frontend és backend együtt, Chromiumban ellenőrizve. A számláló futása alatt nincs másodpercenkénti API-kérés; offline is csökken, frissítéskor az eredeti határidőt folytatja. A részletes gépi eredmény a backend `docs/KULON-CSOMAG-ELLENORZES.md` fájljában található.
+A `tests/countdown.browser.mjs` opcionális Playwright-futtatásához a külön backend és Playwright szükséges; a csomag nem telepít függőségeket automatikusan.

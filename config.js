@@ -1,2 +1,5 @@
-// Production: same-origin /api via reverse proxy. For separate hosts use the API's HTTPS origin.
-window.CLOSEISH_CONFIG={apiBase:''};
+// Public, browser-visible configuration only. Never store private backend secrets here.
+window.CLOSEISH_CONFIG = {
+  apiBase: 'https://closeish-production.up.railway.app',
+  apiKey: ''
+};

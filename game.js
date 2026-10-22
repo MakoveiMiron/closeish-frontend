@@ -50,6 +50,7 @@ const stored=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??
 const localDate=()=>BOOT.date;
 const canPlayDay=n=>BOOT.available && n===BOOT.day_number;
 let allProgress=stored(STORAGE,{});if(!allProgress||typeof allProgress!=='object'||Array.isArray(allProgress))allProgress={};
+const ORIGINAL='closeish-first-completed-v1';let originalRuns=stored(ORIGINAL,{});if(!originalRuns||typeof originalRuns!=='object'||Array.isArray(originalRuns))originalRuns={};
 let reviewQueue=stored(REVIEW,[]);if(!Array.isArray(reviewQueue))reviewQueue=[];
 let dayNum=BOOT.day_number||Core.dayNumber(BOOT.date);
 const availableDays=BOOT.published_dates;
@@ -107,10 +108,10 @@ const dayPack=()=>DATA[String(dayNum)];const questions=()=>Core.questions(dayPac
 const curProgress=()=>allProgress[progressKey()]||{date:BOOT.date,revision:BOOT.revision,runId:crypto.randomUUID(),responses:[],completed:false};
 function saveProgress(){
  const current=allProgress[progressKey()];
- if(current){current.runId||=crypto.randomUUID();current.date=BOOT.date;current.revision=BOOT.revision;current.updatedAt=Date.now();current.status=current.completed?'completed':(current.activeRound!==null&&Number.isInteger(current.activeRound)||current.responses.length?'in_progress':'not_started');}
+ if(current){current.runId||=crypto.randomUUID();current.responses||=[];current.date=BOOT.date;current.revision=BOOT.revision;current.updatedAt=Date.now();current.status=current.completed?'completed':(Number.isInteger(current.activeRound)||current.responses.length?'in_progress':'not_started');}
  try{localStorage.setItem(STORAGE,JSON.stringify(allProgress))}catch{Api.storageWarning()}
 }
-function recordResponse(result){const saved=curProgress();saved.responses[round]=result;saved.activeRound=null;saved.activeDeadline=null;saved.activeDraft=null;saved.activeInputAt=null;saved.pendingSubmission=null;saved.phase='reveal';saved.lastRound=round;saved.completed=saved.responses.filter(Boolean).length===6;if(saved.completed)saved.finishedAt=Date.now();allProgress[progressKey()]=saved;saveProgress();if(saved.completed)Stats.complete(saved)}
+function recordResponse(result){const saved=curProgress();saved.responses[round]=result;saved.activeRound=null;saved.activeDeadline=null;saved.activeDraft=null;saved.activeInputAt=null;saved.pendingSubmission=null;saved.phase='reveal';saved.lastRound=round;saved.completed=saved.responses.filter(Boolean).length===6;if(saved.completed){saved.finishedAt=Date.now();if(!originalRuns[saved.date]){originalRuns[saved.date]=structuredClone(saved);try{localStorage.setItem(ORIGINAL,JSON.stringify(originalRuns))}catch{Api.storageWarning()}}}allProgress[progressKey()]=saved;saveProgress();if(saved.completed)Stats.complete(saved)}
 function scoreSoFar(){return curProgress().responses.filter(Boolean).reduce((s,x)=>s+(x.points||0),0)}
 function roundTimeLimit(){return Number(currentQ()?.time_limit_seconds)||30}
 // Browser-local countdown. No tick endpoint, WebSocket or server push.
@@ -134,7 +135,7 @@ function restoreDraft(s){
 // Same resolution rule for Enter, Submit, and the last-second automatic lock.
 
 // All identity lookup and scoring use the backend's frozen daily data.
-let hintSequence=0,hintTimeout=null,staleDay=false;
+let hintSequence=0,hintTimeout=null,staleDay=false;const hintCache=new Map();
 function candidateMatches(){return []}
 function singleBestCandidate(matches){
  const [a,b]=matches;if(!a)return null;
@@ -159,7 +160,9 @@ function refreshInlineHint(){
 }
 async function requestHints(raw,seq){
  try{
-  const found=await Api.question(currentQ().id,'hints',{q:raw});
+  const cacheKey=currentQ().id+':'+raw.trim().toLocaleLowerCase();
+  let found=hintCache.get(cacheKey);
+  if(!found){found=await Api.question(currentQ().id,'hints',{q:raw});hintCache.set(cacheKey,found);if(hintCache.size>150)hintCache.delete(hintCache.keys().next().value)}
   if(seq!==hintSequence||phase!=='play'||inputValue!==raw||confirmedMatch)return;
   activeHints=found.candidates;refreshInlineHint();
  }catch{if(seq===hintSequence){activeHints=[];refreshInlineHint()}}
@@ -173,21 +176,54 @@ function updateHints(){
  if(inputValue.trim())hintTimeout=setTimeout(()=>requestHints(inputValue,seq),250);
 }
 async function sendAnswer(raw,automatic=false,kind='answer'){
- if(cityLookupPending||phase!=='play')return;
+ if(cityLookupPending||phase!=='play'||staleDay)return;
+ const saved=curProgress();
+ const previous=saved.pendingSubmission;
+ // Retry the exact frozen request: a timeout may mean the server already scored it.
+ const pending=previous||{raw,automatic,kind,questionId:currentQ().id,round,date:BOOT.date,revision:BOOT.revision};
+ if(previous&&previous.questionId!==currentQ().id)return;
+ if(Date.now()<(pending.retryAt||0)){
+  showNotice('Rate limit or connection retry is scheduled. Your answer is safely stored on this device.');
+  return;
+ }
  cityLookupPending=true;stopClock();++hintSequence;clearTimeout(hintTimeout);
- const pending={raw,automatic,kind,questionId:currentQ().id,round,date:BOOT.date,revision:BOOT.revision};
- const saved=curProgress();saved.pendingSubmission=pending;allProgress[progressKey()]=saved;saveProgress();
+ saved.pendingSubmission=pending;allProgress[progressKey()]=saved;saveProgress();
  const field=document.getElementById('guess'),button=document.getElementById('submitGuess');
- if(field)field.disabled=true;if(button){button.disabled=true;button.textContent='CHECKING…'}
+ if(field)field.disabled=true;
+ if(button){button.disabled=true;button.textContent='CHECKING…'}
  try{
-  const reply=await Api.question(currentQ().id,'answer',{raw,automatic,kind,runId:saved.runId});
+  const reply=await Api.question(pending.questionId,'answer',{
+   raw:pending.raw,automatic:pending.automatic,kind:pending.kind,runId:saved.runId
+  });
   cityLookupPending=false;finalize(reply.result);
  }catch(error){
   cityLookupPending=false;
-  staleDay=['DAY_CHANGED','QUESTION_NOT_TODAY','NO_DAILY_GAME'].includes(error.code);
-  if(button){button.disabled=false;button.textContent=staleDay?'LOAD TODAY ↗':'RETRY ↗'}
-  showNotice(staleDay?'A new day is available. Your progress is saved. Reload to continue with today’s game.':'Could not check the answer. It is saved on this device. Reconnect and press RETRY.');
-  // Keep the frozen submission; a network failure is never converted to zero points.
+  const dayChanged=error.status===409||['DAY_CHANGED','QUESTION_NOT_TODAY','NO_DAILY_GAME'].includes(error.code);
+  staleDay=dayChanged;
+  if(error.status===400&&['EMPTY_ANSWER','INVALID_REQUEST','INPUT'].includes(error.code)){
+   // Reject malformed input permanently rather than repeating the same invalid body.
+   saved.pendingSubmission=null;allProgress[progressKey()]=saved;saveProgress();
+   if(timerRemaining()<=0){sendAnswer('',true,'timeout');return}
+   if(field)field.disabled=false;
+   if(button){button.disabled=false;button.textContent='CONFIRM ↵'}
+   showNotice('That answer was rejected. Correct your entry before time runs out.');
+   startClock();return;
+  }
+  if(error.status===429){pending.retryAt=Date.now()+Math.max(1000,(error.retryAfterSeconds||30)*1000);saveProgress()}
+  if(button){button.disabled=false;button.textContent=dayChanged?'LOAD TODAY ↗':'RETRY ↗'}
+  if(dayChanged){
+   showNotice('The daily game or its content has changed. Your previous progress is saved. Reload to start the new version.');
+  }else if(error.status===401||error.status===403){
+   showNotice('Game server configuration error ('+error.code+'). The submission remains saved.');
+  }else if(error.status===413||error.status===415||error.status===400){
+   // Do not silently send a permanently rejected request again.
+   saved.pendingSubmission=null;saveProgress();
+   showNotice('The server rejected this submission ('+(error.code||error.status)+'). Reload to recover.');
+  }else if(error.status===429){
+   showNotice('Too many requests. Your answer remains saved; retry will respect the server delay.');
+  }else{
+   showNotice('Could not check the answer. It is saved on this device. Reconnect and press RETRY.');
+  }
  }
 }
 function timeoutRound(){
@@ -199,7 +235,7 @@ function timeoutRound(){
 }
 function skipRound(){if(cityLookupPending||curProgress().pendingSubmission)return;sendAnswer('',false,'skipped')}
 function nextRound(){if(round>=5){phase='end';render();return}round+=1;playRound()}
-function replayDay(){if(phase!=='end')return;allProgress[progressKey()]={responses:[],completed:false};saveProgress();stopClock();round=0;deadline=null;confirmedMatch=null;inputValue='';phase='intro';answerBookOpen=null;catalogueLockedHeight=null;render()}
+function replayDay(){if(phase!=='end')return;allProgress[progressKey()]={date:BOOT.date,revision:BOOT.revision,runId:crypto.randomUUID(),responses:[],completed:false,practice:true};saveProgress();stopClock();round=0;deadline=null;confirmedMatch=null;inputValue='';phase='intro';answerBookOpen=null;catalogueLockedHeight=null;render()}
 async function submitAnswer(){
  if(staleDay){location.reload();return}
  if(phase!=='play'||cityLookupPending)return;
@@ -215,6 +251,7 @@ function showNotice(t){warning=t;const e=document.getElementById('notice');if(e)
 function submitReview(){submitAnswer()}
 function showDay(n){if(!canPlayDay(n))return;stopClock();round=0;feedback=null;warning='';answerBookOpen=null;catalogueLockedHeight=null;restore()}
 window.addEventListener('online',()=>{const p=curProgress().pendingSubmission;if(p&&phase==='play')sendAnswer(p.raw,p.automatic,p.kind)});
+setInterval(()=>{if(document.hidden||phase!=='play'||cityLookupPending||staleDay)return;const p=curProgress().pendingSubmission;if(p)sendAnswer(p.raw,p.automatic,p.kind)},30000);
 // unitLabel is defined above for user-selected display units.
 function measureGap(q,value){return q.direction==='above'?value-q.limit:q.limit-value}
 function directionText(q){return q.direction==='above'?'AT LEAST':'AT MOST'}
@@ -333,7 +370,7 @@ function calendarHTML(){
  const count=new Date(Date.UTC(year,month+1,0)).getUTCDate(),cells=Array.from({length:(first.getUTCDay()+6)%7},()=>'<span class="cal-empty"></span>');
  for(let d=1;d<=count;d++){
   const iso=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`,saved=allProgress[iso],today=iso===BOOT.date&&BOOT.available;
-  const installed=BOOT.published_dates.includes(iso)||!!saved,done=saved?.completed,partial=!done&&(saved?.responses?.length||saved?.activeRound!==undefined);
+  const installed=BOOT.published_dates.includes(iso)||!!saved||!!originalRuns[iso],done=Boolean(saved?.completed||originalRuns[iso]?.completed),partial=!done&&(saved?.responses?.length||saved?.activeRound!==undefined);
   const status=done?'DONE':partial?`${saved.responses?.filter(Boolean).length||0}/6`:installed?'MISSED':iso>BOOT.date?'FUTURE':'—';
   cells.push(`<button class="cal-day ${done?'cal-completed':today?'cal-selected':'cal-upcoming'}" ${today?`data-day="${dayNum}"`:'disabled'} aria-label="${iso}: ${status}"><span class="cal-date">${d}</span><small>${today&&!done&&!partial?'TODAY':status}</small>${done?'<span class="cal-check">✓</span>':''}</button>`);
  }
