@@ -7,8 +7,8 @@ import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const upstream=new URL(process.env.API_PROXY_TARGET||'http://127.0.0.1:3000');
 if(!['http:','https:'].includes(upstream.protocol))throw new Error('API_PROXY_TARGET must be HTTP(S)');
-const files=new Map(fs.readdirSync(root).filter(f=>/\.(html|js|css)$/.test(f)).map(f=>['/'+f,path.join(root,f)]));
-const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'};
+const files=new Map(fs.readdirSync(root).filter(f=>/\.(html|js|css|svg|txt|xml)$/.test(f)).map(f=>['/'+f,path.join(root,f)]));
+const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.txt':'text/plain; charset=utf-8','.xml':'application/xml; charset=utf-8'};
 const web=http.createServer((req,res)=>{
  const url=new URL(req.url,'http://localhost');
  if(url.pathname.startsWith('/api/')||['/healthz','/readyz'].includes(url.pathname)){
@@ -19,7 +19,7 @@ const web=http.createServer((req,res)=>{
   req.pipe(proxy);return;
  }
  const file=files.get(url.pathname==='/'?'/index.html':url.pathname);
- if(!file){res.writeHead(404);res.end('Not found');return}
+ if(!file){res.writeHead(404,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});fs.createReadStream(path.join(root,'404.html')).pipe(res);return}
  res.writeHead(200,{'Content-Type':types[path.extname(file)],'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});fs.createReadStream(file).pipe(res);
 });
 const port=Number(process.env.WEB_PORT||5173),host=process.env.WEB_HOST||'127.0.0.1';

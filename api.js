@@ -90,20 +90,73 @@ function question(id,action,fields={}){
  return action==='answer'?post(path,data):request(path+'?'+new URLSearchParams(data));
 }
 function loadScript(src){return new Promise((resolve,reject)=>{
- const script=document.createElement('script');script.async=false;script.src=src+'?v=17.8.0';script.onload=resolve;script.onerror=reject;document.head.appendChild(script);
+ const script=document.createElement('script');script.async=false;script.src=src+'?v=17.9.0';script.onload=resolve;script.onerror=()=>reject(new Error('Could not load the game assets.'));document.head.appendChild(script);
 })}
+// Paint the landing page from index.html before fetching ANY game-specific data.
+// Until game.js hydrates it, clicks are queued rather than lost; the clock only
+// starts once the first actual question is visible.
+let gameReady=false,pendingIntent=null;
+const appRoot=document.getElementById('app');
+function setBootStatus(message,isError=false){
+ const status=document.getElementById('bootStatus');if(!status)return;
+ status.textContent=message;status.classList.toggle('boot-error',isError);
+}
+appRoot?.addEventListener?.('click',event=>{
+ if(gameReady)return;
+ const button=event.target?.closest?.('button');if(!button||button.disabled)return;
+ if(button.id==='startBtn'){
+  pendingIntent={type:'play'};button.disabled=true;setBootStatus('Preparing your challenge. The first question will open when it is ready…');
+ }else if(button.dataset.modal&&['rules','archive','suggest'].includes(button.dataset.modal)){
+  pendingIntent={type:'modal',name:button.dataset.modal};
+  setBootStatus('Opening '+button.textContent.trim()+' as soon as the game finishes loading…');
+ }
+});
+function showStartupError(error){
+ console.error('[CLOSEISH] Unable to start:',error);
+ const status=error?.status;
+ const notFound=status===404||error?.code==='INVALID_DAY';
+ const message=notFound?'That challenge does not exist or has not been published.':
+  status===401||status===403?'The game service is temporarily unavailable. Please try again later.':
+  status===429?'Too many requests right now. Please try again shortly.':
+  status>=500?'The game server is having trouble. Your confirmed progress remains on the server.':
+  'We could not load the challenge. Check your connection and try again.';
+ const button=document.getElementById('startBtn');if(button)button.hidden=true;
+ setBootStatus(message,true);
+ const area=appRoot?.querySelector?.('.launch-copy');if(!area)return;
+ const actions=document.createElement('div');actions.className='startup-actions';
+ const retry=document.createElement('button');retry.className='cta';retry.textContent='TRY AGAIN';
+ retry.addEventListener('click',()=>location.reload());actions.append(retry);
+ if(notFound){const home=document.createElement('a');home.className='cta ghost';home.href='/';home.textContent='BACK TO HOME ↗';actions.append(home)}
+ area.append(actions);
+}
 async function start(){
  if(started)return;
  started=true;
  try{
   const requested=new URLSearchParams(globalThis.location?.search||'').get('day');
-  if(requested&&!/^\d{4}-\d{2}-\d{2}$/.test(requested))throw new Error('Invalid day selection');
+  if(requested&&!/^\d{4}-\d{2}-\d{2}$/.test(requested))throw Object.assign(new Error('Invalid day selection'),{status:404,code:'INVALID_DAY'});
   if(requested&&requested<'2026-10-23'){location.replace(location.pathname);return}
-  const [today,remote]=await Promise.all([requested?request('/api/v1/days/'+requested):getToday(),getProgress(requested?.slice(0,7),requested)]);
+  // These three scripts have no day/progress dependency. Download them at the
+  // same time as BOTH API requests instead of delaying all assets until later.
+  globalThis.CLOSEISHApi={question,storageWarning,post,playerId,getToday,getProgress,newUuidV4};
+  const assets=Promise.all(['/view-core.js','/community.js','/score-chart.js'].map(loadScript));
+  const [today,remote]=await Promise.all([
+   requested?request('/api/v1/days/'+requested):getToday(),
+   getProgress(requested?.slice(0,7),requested),assets
+  ]);
   boot=today;globalThis.CLOSEISH_BOOT=boot;globalThis.CLOSEISH_REMOTE_PROGRESS=remote;
   try{localStorage.setItem('closeish-storage-check','1');localStorage.removeItem('closeish-storage-check')}catch{storageWarning()}
-  globalThis.CLOSEISHApi={question,storageWarning,post,playerId,getToday,getProgress,newUuidV4};
-  await Promise.all(['/view-core.js','/community.js','/score-chart.js','/statistics-client.js','/game.js'].map(loadScript));
+  // These depend on the verified server state, which MUST not be guessed from
+  // the static landing page or localStorage.
+  await loadScript('/statistics-client.js');
+  await loadScript('/game.js');
+  gameReady=true;
+  if(pendingIntent?.type==='play')document.getElementById('startBtn')?.click();
+  else if(pendingIntent?.type==='modal'){
+   const name=pendingIntent.name;
+   appRoot?.querySelector?.('[data-modal="'+name+'"]')?.click();
+  }
+  pendingIntent=null;
   let checking=false;
   async function checkDate(){
    if(document.hidden||checking)return;
@@ -118,24 +171,12 @@ async function start(){
    }catch{}finally{checking=false}
   }
   setInterval(checkDate,300000);document.addEventListener('visibilitychange',checkDate);
- }catch(error){
-  console.error('[CLOSEISH] Unable to start:',error);
-  started=false;
-  const app=document.getElementById('app');app.replaceChildren();
-  const panel=document.createElement('main');panel.className='start-screen';
-  const heading=document.createElement('h2');heading.textContent='CLOSEISH';
-  const p=document.createElement('p');
-  p.textContent=error?.status===401?'API authentication is not configured correctly.':
-   error?.status===403?'This website is not authorized by the game server.':
-   'The selected challenge could not be loaded. Check your connection or choose another published day.';
-  const retry=document.createElement('button');retry.className='cta';retry.textContent='TRY AGAIN';retry.onclick=()=>location.reload();
-  panel.append(heading,p,retry);app.append(panel);
- }
+ }catch(error){started=false;showStartupError(error)}
 }
 // Keep two tabs from writing the same anonymous run concurrently.
 if(navigator.locks){
  navigator.locks.request('closeish-game-writer',{ifAvailable:true},async lock=>{
-  if(!lock){const el=document.getElementById('loadStatus');if(el){el.classList.remove('visually-hidden');el.textContent='CLOSEISH is open in another tab. Close that tab, then reload.';}document.getElementById('bootScreen')?.classList.add('boot-blocked');return}
+  if(!lock){setBootStatus('CLOSEISH is open in another tab. Close that tab, then reload.',true);const play=document.getElementById('startBtn');if(play)play.disabled=true;return}
   await start();await new Promise(resolve=>window.addEventListener('pagehide',resolve,{once:true}));
  });
  window.addEventListener('pageshow',event=>{if(event.persisted)location.reload()});

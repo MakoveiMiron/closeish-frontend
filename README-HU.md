@@ -63,3 +63,14 @@ Az új kezelőfelületen mindenhol ARCHIVE szerepel. A nyitónap 2026-10-23, els
 ## Suggest beküldések (szerveres)
 
 A `SUGGEST +` űrlap `POST /api/v1/suggestions` útvonalra küld. Éles üzemben a backendnek rendelkeznie kell a `question_suggestions` PostgreSQL táblával (`005_question_suggestions.sql`). A frontend már nem tárol/exportál javaslattörténetet és nincs DOWNLOAD IDEAS funkció; hálózati hibánál sem állítja, hogy a beküldés sikeres volt. A korábbi demóban kizárólag helyben tárolt javaslatok az új verzió betöltésekor törlődnek, mivel nem kerültek fel a szerverre.
+
+
+## V17.9 – azonnali kezdőképernyő és saját hibaoldalak
+
+A böngésző a `index.html` részeként **azonnal kirajzolja** a CLOSEISH teljes kezdőképernyőjét, a napi kérdések és a PostgreSQL-előrehaladás válaszára várakozás nélkül. A háttérben rögtön, egymással párhuzamosan indulnak a `/api/v1/today` (archívumnál `/api/v1/days/YYYY-MM-DD`) és `/api/v1/progress` lekérések, valamint a függőségmentes JS-fájlok betöltése. A még meg nem érkezett napi kérdések nem kerülnek a kezdőképernyőre, és a böngésző nem tárolja el őket. Amint a szerverválasz és a teljes játék logikája elérhető, a kezdőképernyő a valós napi és előrehaladási állapottal frissül.
+
+A korán megnyomott **LET’S PLAY** nem vész el: a gomb rövid státuszt mutat, és a játék **automatikusan megnyitja az első kérdést**, amint a két szerverválasz beérkezett. A **30 másodperces visszaszámlálás csak a tényleges kör megjelenésekor** indul. Az előzőleg befejezett nap a szerverről érkező állapot alapján zárolva marad; az előzőleg elkezdett kör folytatása a már létező visszaállítási szabály szerint történik. A korai HOW TO PLAY / ARCHIVE / SUGGEST kattintások szintén megvárják a kész felületet, és automatikusan megnyílnak.
+
+A `404.html` egységes, mobilon is megjelenő **valós 404-es** oldal az ismeretlen URL-ekhez; a `500.html` ugyanilyen stílusú tartalék oldal az olyan tárhelyek számára, amelyek támogatják az 500-as sablont. A GitHub Pages az elsőt automatikusan használja, a `500.html` fájlt önmagában nem tudja 500-as hibához hozzárendelni: ezt csak erre képes hoszton/CDN-en lehet konfigurálni. API-hiba, időtúllépés és kapcsolathiány esetén nem tűnik el a kezdőképernyő, hanem értelmes hibaüzenet és **TRY AGAIN** jelenik meg. Az `npm run dev` statikus fejlesztői szerver is a `404.html`-t adja HTTP 404 státusszal az ismeretlen útvonalakra.
+
+Változatlanul nincs buildlépés vagy böngészőbe beépített szerveradat / API titok. Az új `.html`, `.css`, `.js` fájlokat együtt kell a hoszt gyökerébe feltölteni. A böngészőben és a CDN-en korábban tárolt eszközfájlok verziószáma `17.9.0` lett.
