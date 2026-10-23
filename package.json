@@ -1,6 +1,6 @@
 {
   "name": "closeish-frontend",
-  "version": "18.1.0",
+  "version": "18.3.0",
   "private": true,
   "type": "module",
   "description": "Standalone static frontend with browser-local countdown.",

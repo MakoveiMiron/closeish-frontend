@@ -1,4 +1,4 @@
-"""V18.1: verify initial HTML never flashes the intro when restoring a game.
+"""V18.2: skeleton first paint; no splash/intro when restoring a game.
 
 Runs with offline mocked API and Chromium; no production server connection.
 """
@@ -82,6 +82,9 @@ with sync_playwright() as p:
   page=browser_page(context,player_id=player,marker='game')
   assert page.locator('html.closeish-restore-wait').count()==1
   assert page.locator('#restoreSplash').is_visible()
+  assert page.locator('.restore-results-shell .end-dashboard').is_visible()
+  assert page.locator('.restore-results-shell .skeleton-chart').is_visible()
+  assert not page.locator('.hero').is_visible()
   assert not page.locator('#startBtn').is_visible()
   # Deliberately withhold the network response while looking at first paint.
   page.wait_for_timeout(200)
@@ -101,8 +104,24 @@ with sync_playwright() as p:
   page=browser_page(context,player_id=player,marker='game')
   assert page.locator('#restoreSplash').is_visible()
   respond(page,{'month':'2026-10','days':[], 'progress':confirmed,'counted':True,'officialScore':0})
-  page.locator('.end-screen').wait_for(timeout=7000)
+  page.wait_for_function("!document.documentElement.classList.contains('closeish-restore-wait')",timeout=7000)
   assert page.locator('.mock-stat-card').count()==1
+  assert page.locator('.chart-skeleton-live .skeleton-chart').is_visible()
+  assert page.evaluate("JSON.parse(localStorage.getItem('closeish-restore-view-v1'))['2026-10-23']")=='results'
+  # The first data fetch has hydrated the left/right panels. The independently
+  # fetched statistics must keep a same-size skeleton in the middle until ready.
+  assert page.locator('.run-summary .result-sync-ok').is_visible()
+  assert page.locator('.run-answers .book-launch').count()==6
+  page.wait_for_function("window.__requests.some(r=>r.url.includes('/api/v1/statistics'))",timeout=7000)
+  stat={'date':'2026-10-23','revision':'abc123','total':7,'mode':'postgres',
+   'histogram':[{'score':0,'count':3},{'score':1200,'count':2},{'score':2400,'count':2}],
+   'mean':1028.57,'median':1200,'q25':0,'q75':2400,
+   'official':{'score':0,'revision':'abc123'},'comparison':{'betterThanPercent':0,'others':6}}
+  page.evaluate('(v)=>window.__respond("/api/v1/statistics",{statistics:v})',stat)
+  page.locator('.mock-stat-card .chart-canvas svg:visible').wait_for(timeout=7000)
+  assert page.locator('.chart-skeleton-live').count()==0
+  assert page.locator('.mock-stat-card .chart-quartiles').is_visible()
+  assert page.locator('.run-answers .book-launch').count()==6
   assert not page.locator('#startBtn').count()
   assert not page.locator('html.closeish-restore-wait').count()
   page.close()
@@ -113,12 +132,15 @@ with sync_playwright() as p:
    'activeRound':0,'activeDeadline':9999999999999}
   page=browser_page(context,player_id=player,pending=pending)
   assert page.locator('#restoreSplash').is_visible()
+  assert page.locator('.restore-round-shell').is_visible()
+  assert not page.locator('.restore-results-shell').is_visible()
   assert not page.locator('#startBtn').is_visible()
   respond(page,{'month':'2026-10','days':[],'progress':None,'counted':False})
   page.locator('#clock').wait_for(timeout=7000)
   assert not page.locator('html.closeish-restore-wait').count()
   assert page.locator('#startBtn').count()==0
   assert page.locator('#guess').is_visible()
+  assert page.evaluate("JSON.parse(localStorage.getItem('closeish-restore-view-v1'))['2026-10-23']")=='round'
   page.close()
 
   # API outage while the returner's state is unknown: stay on the restore
@@ -131,6 +153,7 @@ with sync_playwright() as p:
   }''')
   page.locator('.restore-error').wait_for(timeout=7000)
   assert page.get_by_role('button',name='TRY AGAIN').is_visible()
+  assert not page.locator('.restore-results-shell').is_visible()
   assert not page.locator('#startBtn').is_visible()
   page.close()
 

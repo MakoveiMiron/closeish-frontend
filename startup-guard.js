@@ -2,7 +2,7 @@
  * A visual hint only. The server remains authoritative for every game state.
  */
 (()=>{'use strict';
- const KEY='closeish-first-screen-v1';
+ const KEY='closeish-first-screen-v1', VIEW_KEY='closeish-restore-view-v1';
  const root=document.documentElement;
  function budapestDate(){
   try{
@@ -21,6 +21,8 @@
   catch{return {}}
  }
  const history=read();
+ function readViews(){try{const value=JSON.parse(localStorage.getItem(VIEW_KEY));return value&&typeof value==='object'&&!Array.isArray(value)?value:{}}catch{return {}}}
+ const views=readViews();
  let returning=false,unfinished=false;
  try{
   returning=Boolean(localStorage.getItem('closeish-player-v1'));
@@ -32,6 +34,7 @@
  // with PostgreSQL first (also covers completions from older frontend versions).
  if(history[date]==='game'||unfinished||(history[date]!=='intro'&&returning)){
   root.classList.add('closeish-restore-wait');
+  root.classList.add(unfinished||views[date]==='round'?'closeish-restore-round':'closeish-restore-results');
  }
  function remember(day,played){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(day||''))return;
@@ -43,6 +46,14 @@
    localStorage.setItem(KEY,JSON.stringify(entries));
   }catch{/* Private browsing may block persistent storage. */}
  }
- function settle(){root.classList.remove('closeish-restore-wait')}
- globalThis.CLOSEISHStartup={remember,settle};
+ function rememberView(day,view){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(day||''))return;
+  try{const entries=readViews();if(view==='results'||view==='round')entries[day]=view;else delete entries[day];
+   const dates=Object.keys(entries).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+   for(const old of dates.slice(0,Math.max(0,dates.length-90)))delete entries[old];
+   localStorage.setItem(VIEW_KEY,JSON.stringify(entries));
+  }catch{/* The server is authoritative, including in private browsing. */}
+ }
+ function settle(){root.classList.remove('closeish-restore-wait','closeish-restore-round','closeish-restore-results')}
+ globalThis.CLOSEISHStartup={remember,rememberView,settle};
 })();

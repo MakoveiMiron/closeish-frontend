@@ -1228,3 +1228,214 @@ html.closeish-restore-wait #restoreSplash{
 .restore-actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
 .restore-actions .cta{width:auto!important;min-width:145px;text-decoration:none}
 @media(max-width:620px){html.closeish-restore-wait #restoreSplash{min-height:310px;padding:36px 18px}}
+
+/* V18.2: keep the true game layout on screen while PostgreSQL restores it.
+   Skeletons contain no cached personal scores, questions or guessed statistics. */
+.restore-splash{display:none}
+html.closeish-restore-wait .hero,
+html.closeish-restore-wait .ticker,
+html.closeish-restore-wait .breakline,
+html.closeish-restore-wait .section-head{display:none!important}
+html.closeish-restore-wait .content{max-width:1760px;padding:20px 27px 25px}
+html.closeish-restore-wait .playgrid{max-width:none;margin:0;grid-template-columns:minmax(0,1fr)}
+html.closeish-restore-wait #gameArea{min-height:0;background:#faf1e8}
+html.closeish-restore-wait #gameArea > .start-screen{display:none!important}
+html.closeish-restore-wait #restoreSplash{display:block;min-height:0;padding:0;text-align:left;background:transparent}
+html.closeish-restore-wait .restore-results-shell{display:block}
+html.closeish-restore-wait .restore-round-shell{display:none}
+html.closeish-restore-round .restore-results-shell{display:none!important}
+html.closeish-restore-round .restore-round-shell{display:block!important}
+.restore-error-content{display:none}
+.restore-loading-announcement{position:absolute}
+.restore-results-shell .end-screen{padding:23px}
+.restore-results-shell .ribbon{align-self:flex-start}
+.restore-results-shell .run-summary .end-rows{margin:16px 0}
+.restore-results-shell .end-row-detail{display:flex;flex-direction:column;gap:9px;min-width:0}
+.restore-results-shell .end-row .skeleton-tier{height:13px;width:64%;max-width:175px}
+.restore-results-shell .end-row .skeleton-answer{height:9px;width:42%;max-width:125px}
+.restore-results-shell .end-score{display:flex;align-items:baseline;gap:7px;margin-top:5px}
+.restore-results-shell .chart-scorecards>div{gap:9px}
+.restore-results-shell .chart-scorecards .skeleton-stat{height:26px;width:83%;max-width:140px}
+.restore-results-shell .chart-scorecards .skeleton-caption{height:7px;width:94%}
+.restore-results-shell .mock-stat-card{margin:0}
+.restore-results-shell .run-answers .book-launch{min-height:69px;cursor:default;justify-content:space-between}
+.restore-results-shell .run-answers .skeleton-question{width:82%;height:26px;flex:1}
+.restore-results-shell .run-answers .ab-list{grid-auto-rows:minmax(60px,1fr)}
+.restore-results-shell .skeleton-sync{height:22px;width:min(100%,315px);margin:8px 0 0}
+.restore-results-shell .skeleton-big-score{height:56px;width:135px}
+.restore-results-shell .skeleton-button{height:44px;width:138px;border:2px solid #302a39;border-radius:8px}
+.restore-results-shell .skeleton-button-short{width:90px}
+.restore-results-shell .skeleton-legend{display:flex;gap:12px;margin:12px 0}
+.restore-results-shell .skeleton-legend span{width:30%;height:7px}
+.restore-results-shell .skeleton-chart-note{width:95%;height:10px;margin:7px 0 0}
+.restore-results-shell .skeleton-note-short{width:66%}
+.restore-results-shell .chart-quartiles .skeleton-quartile{height:25px;width:68%;margin:6px 0}
+.restore-results-shell .skeleton-chart-footer{display:flex;justify-content:space-between;align-items:center;border-top:1px solid #a997c5;padding:12px 4px 3px;margin-top:auto}
+.restore-results-shell .skeleton-chart-footer .skeleton-bar{width:47%;height:12px}
+.restore-results-shell .skeleton-chart-footer>span:last-child{font-size:21px;color:#6750d6}
+.restore-results-shell .skeleton-chart{width:100%;height:clamp(190px,25vw,265px);padding:18px 20px;position:relative;overflow:hidden}
+.restore-results-shell .skeleton-chart-caption{font:800 11px var(--mono);color:#6b5d80;letter-spacing:.035em}
+.restore-results-shell .skeleton-chart-inner{position:absolute;left:20px;right:20px;top:48px;bottom:29px;border-bottom:1.5px solid #9886b1;background:repeating-linear-gradient(90deg,transparent 0,transparent calc(20% - 1px),#bcaed547 calc(20% - 1px),#bcaed547 20%)}
+.restore-results-shell .skeleton-chart-y{display:block;width:100%;height:2px;margin:0;position:absolute;left:0;opacity:.35}
+.restore-results-shell .skeleton-chart-y:nth-child(1){top:20%}
+.restore-results-shell .skeleton-chart-y:nth-child(2){top:40%}
+.restore-results-shell .skeleton-chart-y:nth-child(3){top:60%}
+.restore-results-shell .skeleton-chart-y:nth-child(4){top:80%}
+.restore-results-shell .skeleton-chart-axis{position:absolute;left:20px;right:20px;bottom:13px;height:7px;background:repeating-linear-gradient(90deg,#a99bb7 0 1px,transparent 1px 20%)}
+.skeleton-bar{display:block;flex-shrink:0;background:linear-gradient(105deg,#bfb5c8 4%,#e5ddeb 34%,#c9bfd0 64%,#bfb5c8 95%);background-size:210% 100%;border-radius:5px;animation:closeish-skeleton-pulse 1.55s ease-in-out infinite}
+@keyframes closeish-skeleton-pulse{0%{background-position:105% 0;opacity:.73}50%{opacity:1}100%{background-position:-100% 0;opacity:.73}}
+.restore-round-shell .arena-content{background:linear-gradient(120deg,#fcf3e2,#f2e8fb);padding:28px 32px 30px}
+.restore-round-shell .skeleton-clock{width:112px;height:24px}
+.restore-round-shell .skeleton-prompt{display:flex;flex-direction:column;gap:12px;margin:25px 0;max-width:620px}
+.restore-round-shell .skeleton-prompt .skeleton-bar{height:27px;width:92%}
+.restore-round-shell .skeleton-prompt .skeleton-bar:nth-child(2){width:100%}
+.restore-round-shell .skeleton-prompt .skeleton-bar:nth-child(3){width:65%}
+.restore-round-shell .skeleton-direction{height:34px;width:75%;max-width:320px}
+.restore-round-shell .limitpanel{margin:28px 0;background:#6750d6;min-height:175px;display:flex;flex-direction:column;justify-content:center;gap:15px}
+.restore-round-shell .skeleton-limit{height:55px;width:65%;max-width:300px}
+.restore-round-shell .skeleton-limit-note{height:12px;width:83%;max-width:240px}
+.restore-round-shell .edge-composer{background:#f4d8e6;border:2px solid var(--ink);border-radius:12px;padding:20px 22px;margin-top:25px;box-shadow:4px 4px var(--ink)}
+.restore-round-shell .skeleton-input-row{display:grid;grid-template-columns:minmax(0,1fr) 155px;gap:14px}
+.restore-round-shell .skeleton-input-row .skeleton-bar{height:60px;border:1px solid #9c90a9;border-radius:8px}
+/* An error replaces the skeleton within the SAME game card; the intro never appears. */
+html.closeish-restore-wait #restoreSplash.restore-error .restore-results-shell,
+html.closeish-restore-wait #restoreSplash.restore-error .restore-round-shell{display:none!important}
+html.closeish-restore-wait #restoreSplash.restore-error .restore-error-content{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:13px;min-height:375px;padding:44px 20px;background:linear-gradient(110deg,#fbf1df 0%,#f7e9f7 100%)}
+.restore-error .restore-spinner{display:none}
+.restore-error .restore-copy{color:#822c37}
+@media (min-width:1100px) and (max-height:760px){
+ html.closeish-restore-wait .content{padding-top:14px;padding-bottom:18px}
+ .restore-results-shell .end-screen{padding:17px}
+}
+@media(max-width:700px){
+ html.closeish-restore-wait .content{padding:18px 14px 35px}
+ .restore-results-shell .end-screen{padding:20px 13px}
+ .restore-results-shell .skeleton-chart{height:240px}
+ .restore-results-shell .run-answers .ab-list{grid-template-columns:1fr 1fr}
+ .restore-round-shell .arena-content{padding:23px 18px}
+ .restore-round-shell .skeleton-input-row{grid-template-columns:minmax(0,1fr)}
+ .restore-round-shell .skeleton-input-row .skeleton-bar:last-child{width:130px}
+}
+@media(max-width:520px){.restore-results-shell .run-answers .ab-list{grid-template-columns:1fr}.restore-results-shell .skeleton-big-score{height:52px;width:135px}.restore-results-shell .skeleton-chart{height:205px}}
+@media(prefers-reduced-motion:reduce){.skeleton-bar{animation:none;background:#c7bfd0}}
+
+/* V18.3 — only one game-writing tab: restored full-screen CLOSEISH warning. */
+.concurrent-page[hidden]{display:none!important}
+html.closeish-session-blocked{overflow:hidden!important}
+html.closeish-session-blocked body{overflow:hidden!important}
+html.closeish-session-blocked #app,
+html.closeish-session-blocked #storageNotice{display:none!important}
+html.closeish-session-blocked .concurrent-page{
+ display:grid!important;position:fixed;inset:0;z-index:9999;
+ place-items:center;overflow:hidden;padding:clamp(12px,3.5vw,36px);
+ background:radial-gradient(circle at 15% 15%,#e2d4f8 0,transparent 38%),linear-gradient(133deg,#faf2e2,#f1d9ea);
+}
+.concurrent-card{position:relative;width:min(580px,100%);text-align:center;
+ border:2px solid var(--ink);border-radius:20px;background:#fcf5e8;
+ box-shadow:9px 10px 0 var(--ink);padding:clamp(23px,5vh,46px) clamp(18px,6vw,45px);
+ display:flex;flex-direction:column;align-items:center;gap:12px;overflow:hidden}
+.concurrent-eyebrow{align-self:flex-start;display:flex;gap:8px;align-items:center;
+ font:900 10px/1.4 var(--mono);letter-spacing:.12em}
+.concurrent-dot{width:10px;height:10px;border-radius:50%;background:var(--hot);border:1px solid var(--ink)}
+.concurrent-star{font:950 clamp(42px,8vw,69px)/.8 var(--display);color:var(--hot);text-shadow:3px 3px 0 var(--ink)}
+.concurrent-wordmark{font:950 clamp(25px,6vw,43px)/1 var(--display-readable);letter-spacing:-.06em}
+.concurrent-wordmark span{color:var(--hot)}
+.concurrent-card h1{font:950 clamp(45px,10vw,76px)/.92 var(--display-readable);letter-spacing:-.065em;margin:4px 0}
+.concurrent-card>p{font:650 clamp(13px,2.4vw,16px)/1.45 var(--body);max-width:410px;margin:3px 0 8px}
+.concurrent-actions{width:100%;max-width:260px}.concurrent-actions .cta{width:100%}
+.concurrent-card .concurrent-help{font:700 10px/1.4 var(--mono);color:#746a79;margin:0}
+@media(max-height:490px){.concurrent-card{gap:5px;padding:12px}.concurrent-star{display:none}.concurrent-card h1{font-size:38px}.concurrent-card>p{font-size:12px}}
+
+/* V18.3 — phone PLAY is one self-contained visible-viewport panel.
+   The question, direction, limit, answer and countdown remain together.
+   Secondary ornaments are discarded before any essential question text. */
+@media(max-width:700px){
+ html:has(body.edge-playing){overflow:hidden!important;overscroll-behavior:none}
+ body.edge-playing{overflow:hidden!important;overscroll-behavior:none;touch-action:manipulation}
+ body.edge-playing .content{padding:0!important}
+ body.edge-playing .content>.section-head,body.edge-playing .footer,
+ body.edge-playing .ticker,body.edge-playing .hero,body.edge-playing .breakline{display:none!important}
+ body.edge-playing #gameArea{
+  position:fixed;z-index:12;top:calc(54px + var(--closeish-visible-top,0px));
+  left:8px;right:8px;width:auto;
+  height:calc(var(--closeish-visible-height,100dvh) - 54px - 8px);
+  min-height:0!important;overflow:hidden;display:flex;flex-direction:column;
+  border-radius:11px;box-shadow:3px 3px 0 var(--ink)
+ }
+ body.edge-playing .arena-top{flex:0 0 auto;padding:7px 12px!important;min-height:33px;align-items:center!important}
+ body.edge-playing .arena-top .roundbadge{font-size:9px;line-height:1.2;max-width:calc(100% - 70px)}
+ body.edge-playing .run-total{display:none}
+ body.edge-playing .arena-content{
+  min-height:0!important;flex:1 1 auto;display:flex;flex-direction:column;
+  justify-content:initial!important;padding:8px 12px 7px!important;overflow:hidden
+ }
+ body.edge-playing .round-track{display:none}
+ body.edge-playing .question-stage{display:flex;flex-direction:column;gap:7px;
+  flex:1 1 auto;min-height:0!important;overflow:hidden;justify-content:flex-start}
+ body.edge-playing .question-copy{flex:0 1 auto;min-height:0}
+ body.edge-playing .topic-label{font-size:9px;line-height:1.2;letter-spacing:.6px}
+ body.edge-playing .question-title{font-family:var(--body);font-weight:900;letter-spacing:-.04em;
+  line-height:1.16;margin:4px 0 6px!important;max-width:none;overflow-wrap:break-word}
+ body.edge-playing .edge-direction{margin:0;font-size:9px;line-height:1.1;padding:3px 6px;gap:4px;border-width:1.5px}
+ body.edge-playing .edge-direction .arrow{font-size:14px}
+ body.edge-playing .limitpanel{flex:0 0 auto;box-shadow:2px 2px var(--ink);border-width:2px;
+  border-radius:7px;padding:6px 10px!important;margin:0 2px 4px 0!important;overflow:hidden}
+ body.edge-playing .limitpanel small{font-size:8px;line-height:1.1;letter-spacing:0}
+ body.edge-playing .limitpanel strong{font-size:clamp(21px,7vw,30px)!important;line-height:1;margin:3px 0 1px!important;letter-spacing:-.04em}
+ body.edge-playing .limitpanel .inline-unit{font-size:12px!important}
+ body.edge-playing .score-range-hint{font-size:8px;line-height:1.1;margin:2px 0 0}
+ body.edge-playing .edge-composer{flex:0 0 auto;margin:4px 0 0!important;padding:6px 0 0!important;
+  box-shadow:none;background:transparent;border-top:1px solid #aca3a8;position:relative;bottom:auto;z-index:13}
+ body.edge-playing .edge-composer .input-title{margin:0 0 4px;font-size:9px}
+ body.edge-playing .edge-entrybar{display:block}
+ body.edge-playing .edge-entrybar .input-wrap{display:grid;grid-template-columns:minmax(0,1fr) 88px;
+  gap:6px;align-items:stretch}
+ body.edge-playing .edge-entrybar .guess-shell{grid-column:1;grid-row:1;min-width:0}
+ body.edge-playing .edge-entrybar .textinput{width:100%;height:44px!important;min-height:44px;
+  padding:9px 10px!important;font-size:16px!important;border-radius:7px}
+ body.edge-playing .edge-entrybar .cta{grid-column:2;grid-row:1;min-height:44px;height:44px;
+  padding:5px 4px!important;font-size:10px!important;letter-spacing:-.045em;width:100%;box-shadow:2px 2px var(--blue)}
+ body.edge-playing .edge-timer-near{position:fixed;z-index:16;top:calc(56px + var(--closeish-visible-top,0px));
+  right:17px;left:auto;width:58px;height:28px;min-width:0;padding:2px 4px;
+  flex-direction:row;gap:4px;box-shadow:none;border-width:1px;background:var(--lemon)}
+ body.edge-playing .edge-timer-near strong{font-size:15px;line-height:1}
+ body.edge-playing .edge-timer-near small{font-size:8px}
+ body.edge-playing .edge-composer .inline-actions{margin-top:4px!important;gap:4px}
+ body.edge-playing .edge-composer .inline-actions .typehint{font-size:8px;line-height:1.1}
+ body.edge-playing .edge-composer .quiet{font-size:10px;padding:2px 0;min-height:25px}
+ body.edge-playing .edge-composer .typehint[style*="display: block"],
+ body.edge-playing .edge-composer .notice{font-size:10px;line-height:1.2;padding:4px 6px;margin:3px 0}
+ body.edge-playing .arena-content>.footnote{display:none}
+ body.edge-playing .guess-ghost{font-size:16px!important;left:10px!important}
+ body.edge-playing .edge-entrybar .suggestions{top:auto!important;bottom:calc(100% + 3px)!important;
+  max-height:min(125px,25dvh);overflow-y:auto}
+ body.edge-playing .suggestrow{padding:6px!important}
+ body.edge-playing.closeish-keyboard-open #gameArea{
+  top:var(--closeish-visible-top,0px);left:0;right:0;
+  height:var(--closeish-visible-height,100dvh);
+  border:0;border-radius:0;box-shadow:none}
+ body.edge-playing.closeish-keyboard-open .topbar{display:none!important}
+ body.edge-playing.closeish-keyboard-open .edge-timer-near{top:3px;right:9px}
+ body.edge-playing.closeish-keyboard-open .arena-top{min-height:30px;padding:5px 10px!important}
+ body.edge-playing.closeish-keyboard-open .arena-content{padding:5px 10px 3px!important}
+ body.edge-playing.closeish-keyboard-open .topic-label,
+ body.edge-playing.closeish-keyboard-open .limitpanel small,
+ body.edge-playing.closeish-keyboard-open .score-range-hint,
+ body.edge-playing.closeish-keyboard-open .edge-composer .input-title,
+ body.edge-playing.closeish-keyboard-open .edge-composer .inline-actions>.typehint{display:none!important}
+ body.edge-playing.closeish-keyboard-open .question-stage{gap:4px}
+ body.edge-playing.closeish-keyboard-open .question-title{margin:0 0 3px!important;line-height:1.1}
+ body.edge-playing.closeish-keyboard-open .edge-direction{padding:2px 5px;font-size:9px}
+ body.edge-playing.closeish-keyboard-open .limitpanel{padding:4px 8px!important}
+ body.edge-playing.closeish-keyboard-open .limitpanel strong{font-size:clamp(18px,6.3vw,25px)!important}
+ body.edge-playing.closeish-keyboard-open .edge-composer{padding-top:4px!important;margin-top:1px!important}
+ body.edge-playing.closeish-keyboard-open .edge-composer .inline-actions{margin-top:0!important}
+}
+@media(max-width:700px) and (max-height:480px){
+ body.edge-playing .topbar{display:none!important}
+ body.edge-playing #gameArea{top:0;left:0;right:0;height:var(--closeish-visible-height,100dvh);border:0;border-radius:0;box-shadow:none}
+ body.edge-playing .edge-timer-near{top:3px;right:9px}
+}
+/* Storage was already warned on entry; keep it from covering the question
+   while the player types. It reappears outside the timed round. */
+@media(max-width:700px){body.edge-playing #storageNotice{display:none!important}}

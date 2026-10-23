@@ -97,3 +97,23 @@ A korán megnyomott **LET’S PLAY** nem vész el: a gomb rövid státuszt mutat
 A `404.html` egységes, mobilon is megjelenő **valós 404-es** oldal az ismeretlen URL-ekhez; a `500.html` ugyanilyen stílusú tartalék oldal az olyan tárhelyek számára, amelyek támogatják az 500-as sablont. A GitHub Pages az elsőt automatikusan használja, a `500.html` fájlt önmagában nem tudja 500-as hibához hozzárendelni: ezt csak erre képes hoszton/CDN-en lehet konfigurálni. API-hiba, időtúllépés és kapcsolathiány esetén nem tűnik el a kezdőképernyő, hanem értelmes hibaüzenet és **TRY AGAIN** jelenik meg. Az `npm run dev` statikus fejlesztői szerver is a `404.html`-t adja HTTP 404 státusszal az ismeretlen útvonalakra.
 
 Változatlanul nincs buildlépés vagy böngészőbe beépített szerveradat / API titok. Az új `.html`, `.css`, `.js` fájlokat együtt kell a hoszt gyökerébe feltölteni. A böngészőben és a CDN-en korábban tárolt eszközfájlok verziószáma `17.9.0` lett.
+
+
+## V18.2 – State-aware skeleton loading
+
+- Befejezett nap frissítésekor ugyanannak a háromoszlopos eredményoldalnak a szerkezete tölt be azonnal: hat válaszsor, eloszlásgrafikon, három statisztikai kártya és hat Answer Catalogue sor. A tényleges adatok csak a PostgreSQL válasza után jelennek meg, sosem ideiglenes vagy kitalált pontszámként.
+- A grafikon a statisztikai API-válaszig saját skeletonját mutatja a végleges helyén, ezért a napi adatok második lépcsős betöltésekor sem omlik össze az oszlop.
+- Megkezdett játéknál a kérdésoldal váza látszik, azonnal kezdhető napnál megmarad a LET'S PLAY nyitóképernyő.
+- A mentett helyi jelzés kizárólag azt mondja meg, milyen alakú felületet kell először kirajzolni. Kérdés, eredmény, válaszkatalógus, pontozás továbbra is szerveroldali forrásból jön.
+- A háttéranimáció tiszteletben tartja a prefers-reduced-motion beállítást, hibás hálózati válasznál a skeleton helyén újrapróbálkozás jelenik meg.
+- Az index.html és az api.js verzióparaméterei v=18.2.0-ra változtak, hogy a régi gyorsítótárazott fájlok ne keveredjenek az újakkal.
+- Backend/API-módosítás nem szükséges.
+
+
+## V18.3 — ismételt megnyitás és mobil billentyűzet
+
+- A már futó böngészőlapot a Web Locks API akadályozza meg duplikált, egyidejű szerkesztésben. Ha egy másik lapon már él a zár, a második lapon teljes képernyős, arculatos **ALREADY OPEN** oldal jelenik meg **TRY AGAIN** gombbal. A zár csak azonos böngésző-origin/profil között működik; más böngésző, készülék vagy inkognitóprofil esetén nincs szerveroldali munkamenetzár.
+- A mobilos *aktív játékkör* egy görgetés nélküli, látható viewporthoz (VisualViewport API) igazított kártya. A billentyűzet megnyílásakor a kérdés, a közelítési irány, a határ, a válaszmező, a CONFIRM és a SKIP marad előtérben; a díszítések és másodlagos metaadatok eltűnnek. Hosszabb kérdések szövegmérete a rendelkezésre álló helyhez igazodik.
+- Eredményoldal, archívum, szabályzat, Suggest és a skeleton betöltési folyamat változatlan.
+- Nem kerül sor `user-scalable=no` használatára, ezért a böngésző saját akadálymentesítési nagyítása elérhető marad.
+- Módosított/felvett fájlok: `index.html`, `api.js`, `game.js`, `style.css`, `mobile-viewport.js`, `package.json`, új teszt. A backendhez nem kell hozzányúlni.

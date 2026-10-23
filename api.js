@@ -90,7 +90,7 @@ function question(id,action,fields={}){
  return action==='answer'?post(path,data):request(path+'?'+new URLSearchParams(data));
 }
 function loadScript(src){return new Promise((resolve,reject)=>{
- const script=document.createElement('script');script.async=false;script.src=src+'?v=18.1.0';script.onload=resolve;script.onerror=()=>reject(new Error('Could not load the game assets.'));document.head.appendChild(script);
+ const script=document.createElement('script');script.async=false;script.src=src+'?v=18.3.0';script.onload=resolve;script.onerror=()=>reject(new Error('Could not load the game assets.'));document.head.appendChild(script);
 })}
 // Paint the landing page from index.html before fetching ANY game-specific data.
 // Until game.js hydrates it, clicks are queued rather than lost; the clock only
@@ -125,6 +125,8 @@ function showStartupError(error){
   const splash=document.getElementById('restoreSplash');
   if(splash){
    splash.classList.add('restore-error');
+   splash.setAttribute('aria-busy','false');
+   splash.querySelector('.restore-loading-announcement')?.remove();
    splash.querySelector('.restore-kicker').textContent='UNABLE TO RESTORE';
    splash.querySelector('h2').textContent='CONNECTION ISSUE.';
    splash.querySelector('.restore-copy').textContent=message;
@@ -189,10 +191,20 @@ async function start(){
   setInterval(checkDate,300000);document.addEventListener('visibilitychange',checkDate);
  }catch(error){started=false;showStartupError(error)}
 }
+// A real, full-page duplicate-session view: never expose the intro or the
+// restore skeleton when the Web Lock is held by a different browser tab.
+function showConcurrentPage(){
+ document.documentElement.classList.add('closeish-session-blocked');
+ const page=document.getElementById('alreadyOpenPage');
+ if(page)page.hidden=false;
+ const retry=document.getElementById('retryConcurrent');
+ if(retry)retry.onclick=()=>location.reload();
+ document.title='Already open — CLOSEISH';
+}
 // Keep two tabs from writing the same anonymous run concurrently.
 if(navigator.locks){
  navigator.locks.request('closeish-game-writer',{ifAvailable:true},async lock=>{
-  if(!lock){setBootStatus('CLOSEISH is open in another tab. Close that tab, then reload.',true);const play=document.getElementById('startBtn');if(play)play.disabled=true;return}
+  if(!lock){showConcurrentPage();return}
   await start();await new Promise(resolve=>window.addEventListener('pagehide',resolve,{once:true}));
  });
  window.addEventListener('pageshow',event=>{if(event.persisted)location.reload()});
