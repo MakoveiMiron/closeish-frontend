@@ -59,3 +59,7 @@ Az ARCHIVE naptárban a korábbi közzétett napok is megnyithatók. A kiválasz
 ## V17.7 – ARCHIVE, metrikus mértékegységek, indulás október 23-án
 
 Az új kezelőfelületen mindenhol ARCHIVE szerepel. A nyitónap 2026-10-23, első kihívás #001. A backend dátumait és adatbázis-migrációját lásd: `docs/LAUNCH-2026-10-23.md` a V17.7 backend ZIP-jében. A hét napi kérdéscsomag 2026-10-23–29 között jelenik meg.
+
+## Suggest beküldések (szerveres)
+
+A `SUGGEST +` űrlap `POST /api/v1/suggestions` útvonalra küld. Éles üzemben a backendnek rendelkeznie kell a `question_suggestions` PostgreSQL táblával (`005_question_suggestions.sql`). A frontend már nem tárol/exportál javaslattörténetet és nincs DOWNLOAD IDEAS funkció; hálózati hibánál sem állítja, hogy a beküldés sikeres volt. A korábbi demóban kizárólag helyben tárolt javaslatok az új verzió betöltésekor törlődnek, mivel nem kerültek fel a szerverre.

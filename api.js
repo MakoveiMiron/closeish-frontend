@@ -90,7 +90,7 @@ function question(id,action,fields={}){
  return action==='answer'?post(path,data):request(path+'?'+new URLSearchParams(data));
 }
 function loadScript(src){return new Promise((resolve,reject)=>{
- const script=document.createElement('script');script.async=false;script.src=src+'?v=17.7.0';script.onload=resolve;script.onerror=reject;document.head.appendChild(script);
+ const script=document.createElement('script');script.async=false;script.src=src+'?v=17.8.0';script.onload=resolve;script.onerror=reject;document.head.appendChild(script);
 })}
 async function start(){
  if(started)return;
