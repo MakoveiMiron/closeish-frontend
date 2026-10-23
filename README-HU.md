@@ -1,3 +1,26 @@
+## V18.1 – hibás kezdőképernyő-felvillanás javítása
+
+- Az első betöltés **állapotfüggő**: ha az adott napon még biztosan nem indult játék, továbbra is azonnal megjelenik a kezdőképernyő, miközben az API-hívások párhuzamosan futnak.
+- Korábban megkezdett vagy befejezett játék esetén a szerveres állapot ellenőrzéséig egy semleges „Restoring your game…” képernyő jelenik meg. A statikus HTML kezdőképernyője ilyenkor már a **legelső megjelenítés előtt** el van rejtve; nem villan fel grafikonról, kérdésről vagy eredményoldalról frissítéskor.
+- A szerver válasza alapján közvetlenül a megfelelő kérdés/reveal/eredmény nézet kerül a képernyőre. A visszaszámlálás és a pontozás nem változott, a görbe továbbra sem pollol a háttérben.
+- Régebbi frontendről érkező azonosított látogatóknál, amikor még nincs helyi megjelenítési jelzés, a biztonságos visszatöltés élvez elsőbbséget. Ha a szerver megerősíti, hogy az adott nap még nem kezdődött el, a következő betöltés már azonnali kezdőképernyőt kaphat.
+- A `closeish-first-screen-v1` böngészős kulcs **kizárólag a betöltési nézetet** jegyzi meg dátumonként, legfeljebb 90 napig; nem tartalmaz kérdést, választ, pontszámot vagy hiteles előrehaladást. Az adatbázis marad a hiteles forrás.
+- Ha a visszatöltés sikertelen, a betöltési képernyőn jelenik meg a hiba és a TRY AGAIN, nem vált vissza hirtelen a kezdőoldalra. Új backend-migráció nem szükséges.
+
+Ellenőrzés: `python tests/restore-first-paint.browser.py` (Chromium + Playwright), `python tests/instant-start.browser.py`, `node --test tests/*.mock.mjs`.
+
+---
+
+## V18.0 – inkognitóablak eredményének beszámítása
+
+- A hatodik válasz után a frontend azonnal sorba állítja a szerver által aláírt eredményt, ha az answer API nem jelzett `counted: true` értéket. Nem kell megvárni a NEXT gombot vagy a diagram megnyitását.
+- Ha a szerver `counted: true` választ adott, a diagram első megjelenésekor az API-tól ellenőrzi a hivatalos státuszt. Ha nincs hivatalos eredmény, az aláírt válaszokkal egyszer megkísérli a tartalék beküldést. Az egyébként beszámított eredményt nem POST-olja újra.
+- A befejezett játék mellett látható az `RESULT COUNTED ON THE SERVER`, a függő vagy hibás eredményrögzítés pedig egyértelmű figyelmeztetést kap. Ha a böngésző letiltotta a helyi tárolást, nem szabad bezárni a privát ablakot, amíg a szerver nem igazolta vissza.
+- A backend **V18.0** és a 006-os adatbázis-migráció ajánlott és éles környezetben szükséges a két mentés tranzakciós garanciájához. A frontend változatlanul build nélküli; az azonnali kezdőoldal, az ARCHIVE, a Suggest POST és az egyedi hibaoldalak működnek.
+- A grafikon továbbra is csak az eredményképernyő első megjelenésekor, illetve kész nap betöltésekor kér friss statisztikát; egy nyitva hagyott másik böngészőablak görbéje nem követi élőben az inkognitóablak új eredményét.
+
+---
+
 # CLOSEISH V17.5 – statikus frontend PostgreSQL-előrehaladással
 
 A csomag csak a statikus weboldalt tartalmazza; sem a napi teljes válaszkatalógus, sem a pontozás, sem a PostgreSQL elérés nem található benne. **Nincs kötelező `npm install`, nincs buildlépés**: töltsd fel a statikus fájlokat a webtárhely gyökerébe.

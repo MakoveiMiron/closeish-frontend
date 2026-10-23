@@ -28,7 +28,7 @@ function storageWarning(){
  const notice=document.getElementById('storageNotice');
  if(!notice)return;
  notice.hidden=false;
- notice.textContent='Browser storage is unavailable. Unsynced input may be lost when this tab closes.';
+ notice.textContent='Browser storage is unavailable. Keep this window open until your final score is confirmed by the server.';
 }
 function parseRetryAfter(header){
  if(!header)return 0;
@@ -90,7 +90,7 @@ function question(id,action,fields={}){
  return action==='answer'?post(path,data):request(path+'?'+new URLSearchParams(data));
 }
 function loadScript(src){return new Promise((resolve,reject)=>{
- const script=document.createElement('script');script.async=false;script.src=src+'?v=17.9.0';script.onload=resolve;script.onerror=()=>reject(new Error('Could not load the game assets.'));document.head.appendChild(script);
+ const script=document.createElement('script');script.async=false;script.src=src+'?v=18.1.0';script.onload=resolve;script.onerror=()=>reject(new Error('Could not load the game assets.'));document.head.appendChild(script);
 })}
 // Paint the landing page from index.html before fetching ANY game-specific data.
 // Until game.js hydrates it, clicks are queued rather than lost; the clock only
@@ -120,6 +120,22 @@ function showStartupError(error){
   status===429?'Too many requests right now. Please try again shortly.':
   status>=500?'The game server is having trouble. Your confirmed progress remains on the server.':
   'We could not load the challenge. Check your connection and try again.';
+ const restoring=document.documentElement.classList.contains('closeish-restore-wait');
+ if(restoring){
+  const splash=document.getElementById('restoreSplash');
+  if(splash){
+   splash.classList.add('restore-error');
+   splash.querySelector('.restore-kicker').textContent='UNABLE TO RESTORE';
+   splash.querySelector('h2').textContent='CONNECTION ISSUE.';
+   splash.querySelector('.restore-copy').textContent=message;
+   const actions=splash.querySelector('.restore-actions');
+   actions.replaceChildren();
+   const retry=document.createElement('button');retry.className='cta';retry.textContent='TRY AGAIN';
+   retry.addEventListener('click',()=>location.reload());actions.append(retry);
+   if(notFound){const home=document.createElement('a');home.className='cta ghost';home.href='/';home.textContent='BACK TO HOME ↗';actions.append(home)}
+   return;
+  }
+ }
  const button=document.getElementById('startBtn');if(button)button.hidden=true;
  setBootStatus(message,true);
  const area=appRoot?.querySelector?.('.launch-copy');if(!area)return;

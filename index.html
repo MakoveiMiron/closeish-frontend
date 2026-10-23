@@ -9,20 +9,21 @@
 <meta property="og:title" content="CLOSEISH — The daily game of limits">
 <meta property="og:description" content="Six questions. No multiple choice. See how close you can get.">
 <title>CLOSEISH — The daily game of limits.</title>
-<link rel="icon" href="/favicon.svg?v=17.9.0" type="image/svg+xml">
-<link rel="stylesheet" href="/style.css?v=17.9.0">
-<link rel="preload" as="script" href="/view-core.js?v=17.9.0">
-<link rel="preload" as="script" href="/community.js?v=17.9.0">
-<link rel="preload" as="script" href="/score-chart.js?v=17.9.0">
-<link rel="preload" as="script" href="/statistics-client.js?v=17.9.0">
-<link rel="preload" as="script" href="/game.js?v=17.9.0">
+<link rel="icon" href="/favicon.svg?v=18.1.0" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css?v=18.1.0">
+<link rel="preload" as="script" href="/view-core.js?v=18.1.0">
+<link rel="preload" as="script" href="/community.js?v=18.1.0">
+<link rel="preload" as="script" href="/score-chart.js?v=18.1.0">
+<link rel="preload" as="script" href="/statistics-client.js?v=18.1.0">
+<link rel="preload" as="script" href="/game.js?v=18.1.0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://closeish-production.up.railway.app; object-src 'none'; base-uri 'self'; form-action 'self'">
-<script src="/config.js?v=17.9.0"></script>
-<script defer src="/api.js?v=17.9.0"></script>
+<script src="/startup-guard.js?v=18.1.0"></script>
+<script src="/config.js?v=18.1.0"></script>
+<script defer src="/api.js?v=18.1.0"></script>
 </head>
 <body class="edge-intro">
 <div id="storageNotice" role="status" hidden></div>
-<!-- Static first paint: no daily data, player progress, or JavaScript is required to show the intro. -->
+<!-- Fresh players see the intro immediately; returning players see a quiet restore state while PostgreSQL loads. -->
 <div id="app">
   <header class="topbar"><div class="top-inner">
     <button class="logo" id="homeBtn" type="button" aria-label="CLOSEISH home">CLOSE<span class="period">ISH</span><svg viewBox="0 0 28 28" aria-hidden="true"><path fill="#ff6a55" stroke="#19151f" stroke-width="2" d="M14 1L18 9 27 7 22 15 27 23 17 21 13 28 10 19 1 20 6 13 2 5 11 9Z"/></svg></button>
@@ -38,6 +39,13 @@
       <p id="bootStatus" class="startup-status" role="status" aria-live="polite"></p>
       <button class="intro-rules" data-modal="rules" type="button">HOW TO PLAY <span aria-hidden="true">↗</span></button>
     </div><aside class="launch-guide" aria-label="The daily challenge in numbers"><div class="launch-guide-title"><span>YOUR DAILY DOSE<br>OF ODDLY SPECIFIC.</span><b aria-hidden="true">✳</b></div><div class="launch-stat"><strong>06</strong><span>UNEXPECTED QUESTIONS<small>One answer. Your call.</small></span></div><div class="launch-stat"><strong>30<small>s</small></strong><span>FOR EACH ANSWER<small>Get close. Watch the direction.</small></span></div><div class="launch-stat"><strong>7200</strong><span>POINTS TO CHASE<small>Six perfect hits. Can you?</small></span></div></aside></div>
+    <div id="restoreSplash" class="restore-splash" role="status" aria-live="polite">
+      <span class="restore-spinner" aria-hidden="true"></span>
+      <div class="restore-kicker">YOUR DAILY CHALLENGE</div>
+      <h2>BACK FOR MORE?</h2>
+      <p class="restore-copy">Restoring your game from the server…</p>
+      <div class="restore-actions"></div>
+    </div>
   </section></div></main>
   <footer class="shell footer"><strong>CLOSEISH / KNOW YOUR LIMITS.</strong><span>Wildly specific limits. Free-text answers. No ads.</span></footer>
 </div>

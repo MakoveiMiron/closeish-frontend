@@ -1202,3 +1202,29 @@ body.edge-ended .footer{display:flex!important}
 @media(max-width:720px){.error-card{grid-template-columns:1fr;gap:30px}.error-visual{min-height:190px}.error-number{font-size:120px}.error-main{padding-top:30px;padding-bottom:50px}.error-card{margin:0 8px}.error-top-label{font-size:9px}}
 @media(prefers-reduced-motion:reduce){.error-visual,.error-sticker{transform:none}}
 [hidden]{display:none!important}
+
+/* Completion must never look counted solely because the game ended. */
+.result-sync{display:inline-flex;max-width:100%;align-items:center;margin:7px 0 4px;padding:5px 9px;border:1.5px solid var(--ink);border-radius:7px;font:800 10px/1.4 var(--mono,monospace);letter-spacing:.025em}
+.result-sync-ok{background:#d6fae8;color:#163d2c}
+.result-sync-wait{background:#fff1b3;color:#452d00;overflow-wrap:anywhere}
+
+/* V18.1: never paint a misleading intro while restoring an existing run. */
+.restore-splash{display:none}
+html.closeish-restore-wait #gameArea > .start-screen{display:none!important}
+html.closeish-restore-wait #restoreSplash{
+ display:flex;flex-direction:column;align-items:center;justify-content:center;
+ text-align:center;gap:13px;min-height:390px;padding:44px 20px;
+ background:linear-gradient(110deg,#fbf1df 0%,#f7e9f7 100%);
+}
+.restore-splash .restore-kicker{font:850 11px var(--mono);letter-spacing:.14em;color:var(--muted)}
+.restore-splash h2{font:950 clamp(30px,6vw,49px)/1.06 var(--display-readable);letter-spacing:-.05em;margin:0}
+.restore-splash p{font-size:14px;line-height:1.55;max-width:400px;margin:0;color:#56515c}
+.restore-spinner{display:block;width:38px;height:38px;border:4px solid #c6bfce;
+ border-top-color:var(--blue);border-radius:50%;animation:restore-spin .8s linear infinite}
+@keyframes restore-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.restore-spinner{animation:none;border-top-color:var(--ink)}}
+.restore-splash.restore-error .restore-spinner{display:none}
+.restore-splash.restore-error .restore-copy{color:#822c37}
+.restore-actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.restore-actions .cta{width:auto!important;min-width:145px;text-decoration:none}
+@media(max-width:620px){html.closeish-restore-wait #restoreSplash{min-height:310px;padding:36px 18px}}

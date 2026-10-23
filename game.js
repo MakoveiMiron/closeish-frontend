@@ -152,6 +152,9 @@ function saveProgress(){
  current.runId||=Api.newUuidV4();current.responses||=[];current.date=BOOT.date;
  current.revision=(current.completed&&current.revision)?current.revision:BOOT.revision;
  current.updatedAt=Date.now();
+ globalThis.CLOSEISHStartup?.remember(BOOT.date,Boolean(
+  current.completed||current.responses.length||Number.isInteger(current.activeRound)||
+  current.pendingSubmission||current.phase==='play'||current.phase==='reveal'||REMOTE.counted));
  // Never serialize historical days or synchronized answers into localStorage.
  const unsynced={date:current.date,revision:current.revision,runId:current.runId,
    activeRound:current.activeRound,activeDeadline:current.activeDeadline,
@@ -162,7 +165,24 @@ function saveProgress(){
   else localStorage.setItem(PENDING,JSON.stringify(unsynced));
  }catch{Api.storageWarning()}
 }
-function recordResponse(result,counted=false){const saved=curProgress();saved.responses[round]=result;saved.activeRound=null;saved.activeDeadline=null;saved.activeDraft=null;saved.activeInputAt=null;saved.pendingSubmission=null;saved.phase='reveal';saved.lastRound=round;saved.completed=saved.responses.filter(Boolean).length===6;if(saved.completed){saved.finishedAt=Date.now();completedCountedByServer=Boolean(counted);}allProgress[progressKey()]=saved;saveProgress();/* Request statistics when the end screen first appears, not on round-six reveal. */}
+function recordResponse(result,counted=false,serverProgress=null){
+ const saved=curProgress();
+ // The answer endpoint returns the full committed six-round transcript.
+ // Prefer it when available so the fallback has every signed receipt even if
+ // private browsing/storage evicted an earlier browser-only copy.
+ if(serverProgress?.completed&&serverProgress.date===BOOT.date&&serverProgress.revision===BOOT.revision&&
+    serverProgress.runId===saved.runId&&serverProgress.responses?.length===6){
+  saved.responses=serverProgress.responses;
+ }else saved.responses[round]=result;
+ saved.activeRound=null;saved.activeDeadline=null;saved.activeDraft=null;saved.activeInputAt=null;
+ saved.pendingSubmission=null;saved.phase='reveal';saved.lastRound=round;
+ saved.completed=saved.responses.filter(Boolean).length===6;
+ if(saved.completed){saved.finishedAt=Date.now();completedCountedByServer=Boolean(counted);}
+ allProgress[progressKey()]=saved;saveProgress();
+ // A private tab may close before the user presses NEXT on round six.
+ // Enqueue the signed backup immediately if the backend has not confirmed it.
+ if(saved.completed&&!counted)Stats.complete(saved);
+}
 function scoreSoFar(){return curProgress().responses.filter(Boolean).reduce((s,x)=>s+(x.points||0),0)}
 function roundTimeLimit(){return Number(currentQ()?.time_limit_seconds)||30}
 // Browser-local countdown. No tick endpoint, WebSocket or server push.
@@ -177,7 +197,7 @@ function playRound(){phase='play';confirmedMatch=null;feedback=null;warning='';i
     if(error.status===409){staleDay=true;showNotice('This day is already locked to a different run. Reload to restore it.');}
     else console.warn('[CLOSEISH] Start milestone will be retried by the next answer:',error?.code||error?.message);
  });}
-function finalize(obj,counted=false){if(phase!=='play')return;stopClock();phase='reveal';deadline=null;feedback=obj;recordResponse(obj,counted);render();requestAnimationFrame(()=>document.getElementById('gameArea')?.scrollIntoView({behavior:'instant',block:'start'}))}
+function finalize(obj,counted=false,serverProgress=null){if(phase!=='play')return;stopClock();phase='reveal';deadline=null;feedback=obj;recordResponse(obj,counted,serverProgress);render();requestAnimationFrame(()=>document.getElementById('gameArea')?.scrollIntoView({behavior:'instant',block:'start'}))}
 
 // Persist a draft with its real input timestamp. Only text present before the deadline can auto-lock.
 function saveDraft(){
@@ -252,7 +272,7 @@ async function sendAnswer(raw,automatic=false,kind='answer'){
   const reply=await Api.question(pending.questionId,'answer',{
    raw:pending.raw,automatic:pending.automatic,kind:pending.kind,runId:saved.runId
   });
-  cityLookupPending=false;finalize(reply.result,reply.counted===true);
+  cityLookupPending=false;finalize(reply.result,reply.counted===true,reply.progress);
  }catch(error){
   cityLookupPending=false;
   const dayChanged=error.status===409||['DAY_CHANGED','QUESTION_NOT_TODAY','NO_DAILY_GAME'].includes(error.code);
@@ -424,10 +444,18 @@ function requestChartSnapshotOnce(){
  if(chartSnapshotRequested)return;
  chartSnapshotRequested=true;
  if(Stats.state(BOOT.date).data)return; // An outstanding receipt sync may have supplied the snapshot already.
- if(completedCountedByServer)Stats.refresh(BOOT.date,BOOT.revision);
+ if(completedCountedByServer)Stats.verifyCompletion(curProgress());
  else Stats.complete(curProgress()); // Legacy signed runs still need a one-time submission.
 }
-function endHTML(){const results=curProgress().responses;return `<div class="end-screen"><div class="end-dashboard"><section class="run-summary"><div class="ribbon">✹ THE RUN IS DONE</div><h2>THAT WAS CLOSEISH.</h2><div class="end-score">${formatScore(scoreSoFar())}<small> / ${formatScore(MAX)}</small></div><div class="end-rows" aria-label="Point category, your answer, and earned points for each question">${questions().map((q,i)=>{const r=results[i];return `<div class="end-row"><span class="index">Q${i+1}</span><div class="end-row-detail"><strong class="tier">${escapeHTML(summaryTier(r))}</strong><div class="end-row-meta"><span class="end-row-answer">${escapeHTML(answerName(r))}</span><span class="end-row-points">${formatScore(r?.points??0)} pts</span></div></div></div>`}).join('')}</div><div class="btnrow"><button class="cta" id="shareBtn">COPY RESULTS ↗</button><button class="cta ghost" data-modal="archive">ARCHIVE</button></div></section>${dailyStatsHTML()}${answerCataloguePanelHTML()}</div></div>`}
+function resultSyncHTML(){
+ const state=Stats.state(BOOT.date);
+ const official=Boolean(state.data?.official)||completedCountedByServer||REMOTE.counted;
+ if(official)return '<div class="result-sync result-sync-ok" role="status">✓ RESULT COUNTED ON THE SERVER</div>';
+ if(state.pending)return '<div class="result-sync result-sync-wait" role="status">◷ RESULT NOT COUNTED YET — KEEP THIS WINDOW OPEN UNTIL SYNCED</div>';
+ if(state.error)return '<div class="result-sync result-sync-wait" role="status">! RESULT NOT VERIFIED — '+escapeHTML(state.error)+'</div>';
+ return '<div class="result-sync result-sync-wait" role="status">◷ VERIFYING YOUR RESULT…</div>';
+}
+function endHTML(){const results=curProgress().responses;return `<div class="end-screen"><div class="end-dashboard"><section class="run-summary"><div class="ribbon">✹ THE RUN IS DONE</div><h2>THAT WAS CLOSEISH.</h2>${resultSyncHTML()}<div class="end-score">${formatScore(scoreSoFar())}<small> / ${formatScore(MAX)}</small></div><div class="end-rows" aria-label="Point category, your answer, and earned points for each question">${questions().map((q,i)=>{const r=results[i];return `<div class="end-row"><span class="index">Q${i+1}</span><div class="end-row-detail"><strong class="tier">${escapeHTML(summaryTier(r))}</strong><div class="end-row-meta"><span class="end-row-answer">${escapeHTML(answerName(r))}</span><span class="end-row-points">${formatScore(r?.points??0)} pts</span></div></div></div>`}).join('')}</div><div class="btnrow"><button class="cta" id="shareBtn">COPY RESULTS ↗</button><button class="cta ghost" data-modal="archive">ARCHIVE</button></div></section>${dailyStatsHTML()}${answerCataloguePanelHTML()}</div></div>`}
 
 function calendarHTML(){
  const base=new Date(BOOT.date+'T12:00:00Z'),first=new Date(Date.UTC(base.getUTCFullYear(),base.getUTCMonth()+archiveMonthIndex,1));
@@ -512,6 +540,15 @@ document.addEventListener('click',event=>{
 window.addEventListener('closeish-statistics',()=>{
  const panel=document.querySelector('.end-screen .mock-stat-card');
  if(panel){const holder=document.createElement('div');holder.innerHTML=dailyStatsHTML();panel.replaceWith(holder.firstElementChild);}
+ const sync=document.querySelector('.end-screen .result-sync');
+ if(sync){const holder=document.createElement('div');holder.innerHTML=resultSyncHTML();sync.replaceWith(holder.firstElementChild);}
 });
 saveProgress();restore();
+// Do not reveal any intro until the server-confirmed view has replaced the
+// static HTML; remove the pre-paint guard only after the synchronous restore.
+const restored=curProgress();
+globalThis.CLOSEISHStartup?.remember(BOOT.date,Boolean(
+ restored.completed||restored.responses?.length||Number.isInteger(restored.activeRound)||
+ restored.pendingSubmission||restored.phase==='play'||restored.phase==='reveal'||REMOTE.counted));
+globalThis.CLOSEISHStartup?.settle();
 })();

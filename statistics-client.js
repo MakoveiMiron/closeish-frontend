@@ -88,7 +88,19 @@
   }
   flush().finally(()=>{if(!states.get(progress.date)?.data&&!saved.outbox.some(x=>x.date===progress.date))refresh(progress.date,progress.revision)});
  }
- globalThis.CLOSEISHStats={state,complete,refresh,flush};
+ // Only after the results screen opens: check the server-confirmed completion
+ // using its own playerId, then retry signed receipts if PostgreSQL reports no
+ // official score. This is idempotent and adds no polling/chart refresh loop.
+ async function verifyCompletion(progress){
+  const id=key(progress.date);
+  await refresh(progress.date,progress.revision);
+  const loaded=states.get(progress.date)?.data;
+  if(loaded&&!loaded.official){
+   accepted.delete(id);
+   complete(progress);
+  }
+ }
+ globalThis.CLOSEISHStats={state,complete,refresh,verifyCompletion,flush};
  // Resume only queued result uploads on reconnect/focus. Never re-fetch a displayed chart.
  window.addEventListener('online',()=>{flush()});
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)flush()});
