@@ -79,24 +79,27 @@ async function getToday(){
  try{localStorage.removeItem(TODAY_CACHE)}catch{}
  return data;
 }
-async function getProgress(month){
- const params=new URLSearchParams({playerId});if(month)params.set('month',month);
+async function getProgress(month,day){
+ const params=new URLSearchParams({playerId});if(month)params.set('month',month);if(day)params.set('day',day);
  return request('/api/v1/progress?'+params);
 }
 function question(id,action,fields={}){
  if(!['hints','answer','catalogue'].includes(action))throw new Error('Unsupported question API action');
- const data={date:boot.date,revision:boot.revision,...fields,...(action==='answer'?{playerId}:{})};
+ const data={...fields,date:boot.date,revision:boot.revision,...(action==='answer'?{playerId}:{})};
  const path='/api/v1/questions/'+encodeURIComponent(id)+'/'+action;
  return action==='answer'?post(path,data):request(path+'?'+new URLSearchParams(data));
 }
 function loadScript(src){return new Promise((resolve,reject)=>{
- const script=document.createElement('script');script.async=false;script.src=src+'?v=17.5.1';script.onload=resolve;script.onerror=reject;document.head.appendChild(script);
+ const script=document.createElement('script');script.async=false;script.src=src+'?v=17.7.0';script.onload=resolve;script.onerror=reject;document.head.appendChild(script);
 })}
 async function start(){
  if(started)return;
  started=true;
  try{
-  const [today,remote]=await Promise.all([getToday(),getProgress()]);
+  const requested=new URLSearchParams(globalThis.location?.search||'').get('day');
+  if(requested&&!/^\d{4}-\d{2}-\d{2}$/.test(requested))throw new Error('Invalid day selection');
+  if(requested&&requested<'2026-10-23'){location.replace(location.pathname);return}
+  const [today,remote]=await Promise.all([requested?request('/api/v1/days/'+requested):getToday(),getProgress(requested?.slice(0,7),requested)]);
   boot=today;globalThis.CLOSEISH_BOOT=boot;globalThis.CLOSEISH_REMOTE_PROGRESS=remote;
   try{localStorage.setItem('closeish-storage-check','1');localStorage.removeItem('closeish-storage-check')}catch{storageWarning()}
   globalThis.CLOSEISHApi={question,storageWarning,post,playerId,getToday,getProgress,newUuidV4};
@@ -107,10 +110,10 @@ async function start(){
    checking=true;
    try{
     const latest=await getToday();
-    if(latest.date!==boot.date||latest.revision!==boot.revision||latest.available!==boot.available){
+    if((boot.date===boot.current_date)&&(latest.date!==boot.current_date||latest.revision!==boot.revision||latest.available!==boot.available)){
      const notice=document.getElementById('storageNotice');notice.hidden=false;
      notice.replaceChildren(document.createTextNode('The daily challenge has changed. Your previous progress is saved. '));
-     const button=document.createElement('button');button.textContent='LOAD TODAY';button.onclick=()=>location.reload();notice.append(button);
+     const button=document.createElement('button');button.textContent='LOAD TODAY';button.onclick=()=>location.assign(location.pathname);notice.append(button);
     }
    }catch{}finally{checking=false}
   }
@@ -124,7 +127,7 @@ async function start(){
   const p=document.createElement('p');
   p.textContent=error?.status===401?'API authentication is not configured correctly.':
    error?.status===403?'This website is not authorized by the game server.':
-   'Today’s challenge could not be loaded. Check your connection and try again.';
+   'The selected challenge could not be loaded. Check your connection or choose another published day.';
   const retry=document.createElement('button');retry.className='cta';retry.textContent='TRY AGAIN';retry.onclick=()=>location.reload();
   panel.append(heading,p,retry);app.append(panel);
  }

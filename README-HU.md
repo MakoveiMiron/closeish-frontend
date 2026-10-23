@@ -2,9 +2,9 @@
 
 A csomag csak a statikus weboldalt tartalmazza; sem a napi teljes válaszkatalógus, sem a pontozás, sem a PostgreSQL elérés nem található benne. **Nincs kötelező `npm install`, nincs buildlépés**: töltsd fel a statikus fájlokat a webtárhely gyökerébe.
 
-## Fontos: közös V17.5 telepítés
+## Fontos: közös V17.7 telepítés
 
-A frontendnek a V17.5 backendhez és annak **002–003 SQL-migrációihoz** kell kapcsolódnia. A régi V17.4 backenddel már nem működik a kezdő állapot lekérése. Előbb a backend-migráció és az új API kerüljön élesbe, utána a statikus frontend. A részletes folyamat: `README-V17.5-POSTGRES.md`, illetve a backend csomag `docs/POSTGRES-PROGRESS-PERFORMANCE.md`.
+A frontendnek a **V17.7 backendhez és az 001–004 SQL-migrációihoz** kell kapcsolódnia. A régi V17.6 backenddel már nem működik a kezdő állapot lekérése. Előbb a backend-migráció és az új API kerüljön élesbe, utána a statikus frontend. A részletes folyamat: `README-V17.5-POSTGRES.md`, illetve a backend csomag `docs/POSTGRES-PROGRESS-PERFORMANCE.md`.
 
 ## Konfiguráció
 
@@ -23,7 +23,7 @@ A végleges domainhez állítsd be a backend `ALLOWED_ORIGINS` pontos értékét
 
 A PostgreSQL az igazság forrása az összes hitelesen elküldött válasz, aktuális állapot, végleges eredmény és archívumnap vonatkozásában. A böngésző csak a játékos UUID-ját (`closeish-player-v1`), a **folyamatban lévő, még nem feltétlenül szinkronizált** kör állapotát (`closeish-pending-v1`) és az esetleg el nem küldött végső eredmény várólistáját (`closeish-statistics-v1`) őrzi. A *SUGGEST* funkció továbbra is helyi, beküldés nélküli jegyzetfüzetet használ.
 
-A régi `closeish-progress-v2` archívumot a frontend egyszer megkísérli hitelesen feltölteni az új API-ra, ha még érvényesek az aláírásai. Sikeres migráció után eltávolítja; a nem ellenőrizhető történeti adatot nem törli automatikusan. Már korábban beszámított eredmények szerveroldalról befejezettnek számítanak, és soha nem játszhatók újra.
+A V17.7 dátumváltása miatt a régi `closeish-progress-v2` rekordok már nem tölthetők fel biztonságosan ugyanahhoz a dátumhoz; a szerveres eredményeket a 004-es migráció rendezi át. A régi böngészős rekordokat a frontend nem tekinti hiteles előrehaladásnak, de nem is törli automatikusan. Sikeres migráció után eltávolítja; a nem ellenőrizhető történeti adatot nem törli automatikusan. Már korábban beszámított eredmények szerveroldalról befejezettnek számítanak, és soha nem játszhatók újra.
 
 ## Gyorsítás
 
@@ -50,3 +50,12 @@ node tests/uuid-fallback.mock.mjs
 ```
 
 A Playwright-es teljes kör/újratöltés tesztje a külön backenddel: `tests/countdown.browser.mjs`. A böngészős tesztet a telepítési környezetben is el kell végezni. A 150 ezer játékos/nap terhelés külön load testtel igazolandó.
+
+
+## V17.6: korábbi napok lejátszása
+
+Az ARCHIVE naptárban a korábbi közzétett napok is megnyithatók. A kiválasztott nap `?day=YYYY-MM-DD` URL-en nyílik meg. A backend a mai vagy korábbi scheduled naphoz enged új játékot, ugyanarra a napra ugyanannak a játékosnak csak egy futása lehet; az eredmény az eredeti napi statisztikát növeli. **A V17.6 frontendhez V17.6 backend is kell.** Az előző PostgreSQL migrációk érvényesek; új migráció nincs.
+
+## V17.7 – ARCHIVE, metrikus mértékegységek, indulás október 23-án
+
+Az új kezelőfelületen mindenhol ARCHIVE szerepel. A nyitónap 2026-10-23, első kihívás #001. A backend dátumait és adatbázis-migrációját lásd: `docs/LAUNCH-2026-10-23.md` a V17.7 backend ZIP-jében. A hét napi kérdéscsomag 2026-10-23–29 között jelenik meg.

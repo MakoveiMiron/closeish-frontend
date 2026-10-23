@@ -15,7 +15,7 @@ function launch(file,cwd,env,ready){
 }
 let browser;
 try{
- await launch('src/server.mjs',backend,{NODE_ENV:'development',DEV_DATE:'2026-10-22',HOST:'127.0.0.1',PORT:String(apiPort),DATABASE_URL:'',STATS_MODE:'memory',ALLOWED_ORIGINS:base,RATE_LIMIT_PER_MINUTE:'0'},'CLOSEISH API');
+ await launch('src/server.mjs',backend,{NODE_ENV:'development',DEV_DATE:'2026-10-23',HOST:'127.0.0.1',PORT:String(apiPort),DATABASE_URL:'',STATS_MODE:'memory',ALLOWED_ORIGINS:base,RATE_LIMIT_PER_MINUTE:'0'},'CLOSEISH API');
  await launch('scripts/dev.mjs',frontend,{WEB_PORT:String(webPort),API_PROXY_TARGET:'http://127.0.0.1:'+apiPort},'CLOSEISH frontend');
  browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE}:{}),args:['--no-sandbox','--disable-dev-shm-usage']});
  const context=await browser.newContext(),page=await context.newPage(),errors=[],requests=[];
@@ -42,7 +42,7 @@ try{
  const first=await saved();assert.equal(first.responses[0].kind,'timeout');assert.equal(first.responses[0].points,0);assert.ok(first.responses[0].receipt);
  for(let i=0;i<5;i++){await page.locator('#nextBtn').click();await page.locator('#skipBtn').click()}
  await page.locator('#nextBtn').click();await page.locator('.end-screen').waitFor();
- await page.waitForFunction(()=>CLOSEISHStats.state('2026-10-22').data?.total===1);
+ await page.waitForFunction(()=>CLOSEISHStats.state('2026-10-23').data?.total===1);
  assert.deepEqual(errors,[]);
  console.log(JSON.stringify({passed:true,independentFrontendAndBackend:true,roundSeconds:30,idleTickRequests:0,offlineCountdown:true,reloadPreservesDeadline:true,timeoutRequestsAtZero:1,offlineTimeoutRetried:true,fullGameAndStatistics:true},null,2));
 }finally{
