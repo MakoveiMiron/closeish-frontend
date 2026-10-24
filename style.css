@@ -1158,20 +1158,49 @@ body.edge-playing .edge-entrybar .guess-shell .textinput{font-size:20px}
 .chart-data-open{display:flex;justify-content:space-between;gap:15px;align-items:center;width:100%;margin-top:auto;padding:12px 5px 5px;background:transparent;border:0;border-top:1px solid #ac99cb;color:var(--ink);font:800 10px/1.35 var(--mono);text-align:left;cursor:pointer}
 .chart-data-open span{font-size:20px;line-height:1;color:var(--blue)}
 .chart-data-open:hover,.chart-data-open:focus-visible{background:#e5d9fa}
-.modal-stats{width:min(510px,calc(100vw - 22px));max-height:min(700px,calc(100dvh - 28px));overflow:hidden;display:flex;flex-direction:column}
+/* V18.4: show all exact score values at once, arranged in readable columns.
+   No scroll area: opening the dialog never hides the rest of the histogram. */
+.modal-stats{width:min(1160px,calc(100vw - 22px));max-height:calc(100dvh - 18px);overflow:hidden;display:flex;flex-direction:column}
 .modal-stats .modalhead{flex:none}
-.modal-stats .modalcontent{display:flex;flex:1;min-height:0;flex-direction:column;padding:16px 20px 20px}
-.exact-count-intro{margin:0 0 12px;font:600 12px/1.5 var(--body)}
-.exact-count-scroll{min-height:0;max-height:58dvh;overflow-y:auto;overscroll-behavior:contain;border:2px solid var(--ink);border-radius:9px;background:#f5efff}
-.exact-count-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font:600 12px/1.4 var(--mono)}
-.exact-count-table thead th{position:sticky;top:0;z-index:2;padding:12px 15px;background:#dfd0f8;text-align:left;border-bottom:2px solid var(--ink);font-weight:900}
-.exact-count-table td,.exact-count-table tbody th{padding:10px 15px;border-bottom:1px solid #dacfe3;text-align:left}
+.modal-stats .modalcontent{display:flex;flex:0 1 auto;min-height:0;flex-direction:column;padding:16px 20px 20px;overflow:visible}
+.exact-count-intro{margin:0 0 13px;font:600 12px/1.5 var(--body)}
+.exact-count-grid{display:grid;grid-template-columns:repeat(var(--exact-columns),minmax(0,1fr));gap:10px;min-width:0;align-items:start}
+.exact-count-table{width:100%;border:2px solid var(--ink);border-radius:8px;border-spacing:0;table-layout:auto;overflow:hidden;background:#f5efff;font:600 12px/1.3 var(--mono)}
+.exact-count-table thead th{padding:9px 11px;background:#dfd0f8;text-align:left;border-bottom:2px solid var(--ink);font-weight:900}
+.exact-count-table td,.exact-count-table tbody th{padding:7px 11px;border-bottom:1px solid #dacfe3;text-align:left;white-space:nowrap}
 .exact-count-table tbody th{font-weight:700}
 .exact-count-table tbody tr:nth-child(even){background:#eee4f8}
 .exact-count-table tbody tr:last-child td,.exact-count-table tbody tr:last-child th{border-bottom:0}
+@media(max-width:600px){
+ .modal-stats .modalcontent{padding:11px 9px 12px}
+ .modal-stats .modalhead{padding:10px 12px}
+ .modal-stats .modalhead strong{font-size:19px}
+ .exact-count-intro{font-size:10px;line-height:1.35;margin-bottom:8px}
+ .exact-count-grid{gap:5px}
+ .exact-count-table{font-size:10px;line-height:1.25;border-width:1px;border-radius:5px}
+ .exact-count-table thead th{font-size:9px;padding:6px 4px;border-bottom-width:1px}
+ .exact-count-table td,.exact-count-table tbody th{padding:4px 4px}
+}
+@media(max-width:600px){
+ .exact-count-table .exact-count-long{font-size:9px;letter-spacing:-.05em;padding-inline:1px}
+}
+@media(max-width:360px){
+ .exact-count-table .exact-count-long{font-size:8px;letter-spacing:-.06em;padding-inline:1px}
+}
+@media(max-height:540px){
+ .modal-stats .modalhead{padding:8px 12px}
+ .modal-stats .modalhead strong{font-size:17px}
+ .modal-stats .modalhead .closebtn{width:29px;height:29px;font-size:20px}
+ .modal-stats .modalcontent{padding:7px 9px 9px}
+ .exact-count-intro{font-size:10px;line-height:1.25;margin-bottom:6px}
+ .exact-count-grid{gap:5px}
+ .exact-count-table{font-size:10px;line-height:1.05;border-width:1px;border-radius:5px}
+ .exact-count-table thead th{font-size:9px;padding:4px 4px;border-bottom-width:1px}
+ .exact-count-table td,.exact-count-table tbody th{padding:3px 4px}
+}
 /* Keep the requested small print along the bottom, including after completion. */
 body.edge-ended .footer{display:flex!important}
-@media(max-width:520px){.modal-stats .modalcontent{padding:12px}.run-summary .btnrow{gap:9px}.run-summary .btnrow .cta{min-height:45px;padding:11px 10px;font-size:9px}.exact-count-scroll{max-height:64dvh}}
+@media(max-width:520px){.modal-stats .modalcontent{padding:12px}.run-summary .btnrow{gap:9px}.run-summary .btnrow .cta{min-height:45px;padding:11px 10px;font-size:9px}}
 @media(prefers-reduced-motion:reduce){.boot-orbit,.boot-marker,.boot-progress span{animation:none!important}.boot-orbit.orbit-a{transform:rotate(12deg)}.boot-orbit.orbit-b{transform:rotate(35deg)}}
 
 /* A previously counted legacy day can show its server snapshot even without round details. */

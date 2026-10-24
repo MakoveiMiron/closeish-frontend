@@ -458,7 +458,7 @@ function requestChartSnapshotOnce(){
 function resultSyncHTML(){
  const state=Stats.state(BOOT.date);
  const official=Boolean(state.data?.official)||completedCountedByServer||REMOTE.counted;
- if(official)return '<div class="result-sync result-sync-ok" role="status">✓ RESULT COUNTED ON THE SERVER</div>';
+ if(official)return ''; // Successful saves are silent; pending/error verification warnings remain visible.
  if(state.pending)return '<div class="result-sync result-sync-wait" role="status">◷ RESULT NOT COUNTED YET — KEEP THIS WINDOW OPEN UNTIL SYNCED</div>';
  if(state.error)return '<div class="result-sync result-sync-wait" role="status">! RESULT NOT VERIFIED — '+escapeHTML(state.error)+'</div>';
  return '<div class="result-sync result-sync-wait" role="status">◷ VERIFYING YOUR RESULT…</div>';
@@ -486,10 +486,33 @@ let answerBookOpen=null;
 let catalogueLockedHeight=null;
 let modalTrigger='[data-modal="rules"]';
 function closeOverlay(){showModal=null;render();document.querySelector(modalTrigger)?.focus()}
+function exactCountColumnCount(rowCount){
+ // Split the complete histogram into side-by-side score/player tables. Account
+ // for the actual viewport so a tall single-column table is never necessary.
+ const width=window.innerWidth||document.documentElement.clientWidth||390;
+ const height=window.innerHeight||document.documentElement.clientHeight||700;
+ const isSmall=width<600;
+ const maxColumns=Math.max(1,Math.min(6,Math.floor((width-28)/(isSmall?88:155))));
+ const comfortableColumns=width>=1120?5:width>=700?4:3;
+ const rowHeight=height<=480?19:isSmall?24:32;
+ const availableRows=Math.max(1,Math.floor((height-(height<=480?102:150))/rowHeight));
+ const neededColumns=Math.ceil(rowCount/availableRows);
+ return Math.max(1,Math.min(maxColumns,Math.max(comfortableColumns,neededColumns)));
+}
 function exactScoresModalHTML(){
  const stats=Stats.state(BOOT.date).data;
  if(!stats?.histogram?.length)return '<p class="chart-note">Daily score counts are not available yet.</p>';
- return `<p class="exact-count-intro"><strong>${formatNum(stats.total||0)}</strong> completed games · ${escapeHTML(stats.date||BOOT.date)}. Each possible score is shown separately.</p><div class="exact-count-scroll" role="region" tabindex="0" aria-label="All exact daily score counts"><table class="exact-count-table"><thead><tr><th scope="col">SCORE</th><th scope="col">PLAYERS</th></tr></thead><tbody>${stats.histogram.map(row=>`<tr><th scope="row">${formatScore(row.score)}</th><td>${formatNum(row.count)}</td></tr>`).join('')}</tbody></table></div>`;
+ const rows=stats.histogram;
+ const columns=exactCountColumnCount(rows.length);
+ const baseSize=Math.floor(rows.length/columns);
+ const extra=rows.length%columns;
+ const tables=Array.from({length:columns},(_,i)=>{
+  const offset=i*baseSize+Math.min(i,extra);
+  const part=rows.slice(offset,offset+baseSize+(i<extra?1:0));
+  if(!part.length)return '';
+  return `<table class="exact-count-table"><thead><tr><th scope="col">SCORE</th><th scope="col">PLAYERS</th></tr></thead><tbody>${part.map(row=>`<tr><th scope="row">${formatScore(row.score)}</th><td class="${String(row.count).length>4?'exact-count-long':''}">${formatNum(row.count)}</td></tr>`).join('')}</tbody></table>`;
+ }).join('');
+ return `<p class="exact-count-intro"><strong>${formatNum(stats.total||0)}</strong> completed games · ${escapeHTML(stats.date||BOOT.date)}. Each possible score is shown separately.</p><div class="exact-count-grid" style="--exact-columns:${columns}" aria-label="All exact daily score counts">${tables}</div>`;
 }
 function modalHTML(){
  if(!showModal)return '';
@@ -498,6 +521,11 @@ function modalHTML(){
  const title=showModal==='rules'?'HOW TO PLAY':showModal==='suggest'?'SUGGEST A QUESTION':showModal==='archive'?'ARCHIVE':showModal==='stats'?'DAILY SCORE COUNTS':'ABOUT CLOSEISH';
  return `<div class="modalwrap" id="modalWrap"><div class="modal modal-${showModal}" role="dialog" aria-modal="true" aria-labelledby="overlayTitle"><div class="modalhead"><strong id="overlayTitle">${title}</strong><button id="closeModal" class="closebtn" aria-label="Close">×</button></div>${phase==='play'?'<div class="modal-timer-note" role="note">Your round timer keeps running while this is open.</div>':''}<div class="modalcontent">${content}</div></div></div>`;
 }
+window.addEventListener('resize',()=>{
+ if(showModal!=='stats')return;
+ const content=document.querySelector('.modal-stats .modalcontent');
+ if(content)content.innerHTML=exactScoresModalHTML();
+});
 document.addEventListener('keydown',event=>{
  if(!showModal)return;
  if(event.key==='Escape'){event.preventDefault();closeOverlay();return}
@@ -552,7 +580,7 @@ window.addEventListener('closeish-statistics',()=>{
  const panel=document.querySelector('.end-screen .mock-stat-card');
  if(panel){const holder=document.createElement('div');holder.innerHTML=dailyStatsHTML();panel.replaceWith(holder.firstElementChild);}
  const sync=document.querySelector('.end-screen .result-sync');
- if(sync){const holder=document.createElement('div');holder.innerHTML=resultSyncHTML();sync.replaceWith(holder.firstElementChild);}
+ if(sync){const holder=document.createElement('div');holder.innerHTML=resultSyncHTML();const next=holder.firstElementChild;if(next)sync.replaceWith(next);else sync.remove();}
 });
 saveProgress();restore();
 // Do not reveal any intro until the server-confirmed view has replaced the

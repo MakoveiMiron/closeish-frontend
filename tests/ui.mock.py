@@ -37,7 +37,7 @@ with sync_playwright() as p:
  }''')
  page.evaluate('''boot => {
   window.CLOSEISH_BOOT=boot;
-  window.CLOSEISHApi={playerId:'00000000-0000-4000-8000-000000000001',newUuidV4:window.__uuidV4,storageWarning(){},
+  window.CLOSEISHApi={playerId:'00000000-0000-4000-8000-000000000001',newUuidV4:window.__uuidV4,storageWarning(){},async post(){return {ok:true}},
    async question(id,action,fields){
     if(action==='hints'){window.__calls.hints++;return {candidates:[]}}
     if(action==='catalogue')return {total:0,offset:0,entries:[]};
@@ -57,13 +57,13 @@ with sync_playwright() as p:
   page.add_script_tag(content=(ROOT/name).read_text())
  page.locator('#startBtn').click(timeout=3000)
  assert page.locator('#clock').inner_text()=='30s'
- deadline=page.evaluate("JSON.parse(localStorage.getItem('closeish-progress-v2'))['2026-10-22'].activeDeadline")
+ deadline=page.evaluate("JSON.parse(localStorage.getItem('closeish-pending-v1')).activeDeadline")
  assert deadline>0
  # Verify deadline persists when modals are opened/closed.
  page.locator('[data-modal="rules"]').first.click()
  assert page.locator('.modal').count()==1
  page.locator('#closeModal').click()
- assert page.evaluate("JSON.parse(localStorage.getItem('closeish-progress-v2'))['2026-10-22'].activeDeadline")==deadline
+ assert page.evaluate("JSON.parse(localStorage.getItem('closeish-pending-v1')).activeDeadline")==deadline
  for _ in range(6):
   page.locator('#skipBtn').click()
   page.locator('#nextBtn').wait_for(timeout=5000)
@@ -78,14 +78,16 @@ with sync_playwright() as p:
  page.locator('#bookBack').click()
  assert page.locator('#replayBtn').count()==0
  assert page.get_by_text('REPLAY DAY').count()==0
- assert page.evaluate("JSON.parse(localStorage.getItem('closeish-progress-v2'))['2026-10-22'].runId")
- assert page.evaluate("JSON.parse(localStorage.getItem('closeish-first-completed-v1'))['2026-10-22'].completed") is True
+ assert page.evaluate("localStorage.getItem('closeish-pending-v1')") is None
+ assert page.locator('.end-score').is_visible()
  assert page.locator('[data-exact-counts]').count()==1
  assert page.locator('.end-screen .exact-count-table').count()==0
  page.locator('[data-exact-counts]').click()
  assert page.get_by_role('dialog',name='DAILY SCORE COUNTS').count()==1
  assert page.locator('.modal-stats .exact-count-table tbody tr').count()==37
- assert page.locator('.modal-stats .exact-count-scroll').evaluate('(e)=>getComputedStyle(e).overflowY')=='auto'
+ assert page.locator('.modal-stats .exact-count-table').count()>=2
+ assert page.locator('.modal-stats .exact-count-scroll').count()==0
+ assert page.locator('.modal-stats').evaluate('(e)=>e.scrollHeight<=e.clientHeight')
  page.keyboard.press('Escape')
  assert page.get_by_role('dialog').count()==0
  page.locator('[data-modal="rules"]').first.click()
@@ -96,6 +98,7 @@ with sync_playwright() as p:
  assert len(heights)==2 and len(set(heights))==1, heights
  page.locator('#homeBtn').click()
  assert page.locator('.end-screen').count()==1
+ assert page.locator('.run-summary .result-sync-ok').count()==0
  assert page.locator('#startBtn').count()==0
  assert page.evaluate('window.__calls.answers.length')==6
  print(json.dumps({'passed':True,'sixSkippedAndSigned':True,'catalogueAfterCompletion':True,

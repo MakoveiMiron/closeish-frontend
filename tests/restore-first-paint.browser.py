@@ -110,7 +110,7 @@ with sync_playwright() as p:
   assert page.evaluate("JSON.parse(localStorage.getItem('closeish-restore-view-v1'))['2026-10-23']")=='results'
   # The first data fetch has hydrated the left/right panels. The independently
   # fetched statistics must keep a same-size skeleton in the middle until ready.
-  assert page.locator('.run-summary .result-sync-ok').is_visible()
+  assert page.locator('.run-summary .result-sync').count()==0
   assert page.locator('.run-answers .book-launch').count()==6
   page.wait_for_function("window.__requests.some(r=>r.url.includes('/api/v1/statistics'))",timeout=7000)
   stat={'date':'2026-10-23','revision':'abc123','total':7,'mode':'postgres',

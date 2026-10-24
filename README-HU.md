@@ -1,3 +1,12 @@
+## V18.4 – kompakt eredményképernyő és teljes ponttáblázat
+
+- Sikeres eredménymentésnél a zöld `RESULT COUNTED ON THE SERVER` sáv nem jelenik meg. A mentésellenőrzés továbbra is fut, és sikertelen vagy függő rögzítésnél a figyelmeztetés megmarad.
+- `VIEW EXACT SCORE COUNTS`: a 0–7200 között elérhető összes lehetséges pontszám (37 érték, 200 pontos lépcsőkkel) egyszerre látszik, több, egymás melletti SCORE / PLAYERS oszlopcsoportban, a táblázaton belüli görgetés nélkül.
+- A táblázatcsoportok száma a képernyő méretéhez igazodik; nyitott ablak átméretezésekor is újrarendeződnek.
+- Az eredményadatok nem változnak, a frontend továbbra is a backend által küldött histogramot jeleníti meg, a görbe/stat-API működése és a V18.3 mobilos billentyűzetes nézet változatlan.
+
+---
+
 ## V18.1 – hibás kezdőképernyő-felvillanás javítása
 
 - Az első betöltés **állapotfüggő**: ha az adott napon még biztosan nem indult játék, továbbra is azonnal megjelenik a kezdőképernyő, miközben az API-hívások párhuzamosan futnak.
@@ -15,7 +24,7 @@ Ellenőrzés: `python tests/restore-first-paint.browser.py` (Chromium + Playwrig
 
 - A hatodik válasz után a frontend azonnal sorba állítja a szerver által aláírt eredményt, ha az answer API nem jelzett `counted: true` értéket. Nem kell megvárni a NEXT gombot vagy a diagram megnyitását.
 - Ha a szerver `counted: true` választ adott, a diagram első megjelenésekor az API-tól ellenőrzi a hivatalos státuszt. Ha nincs hivatalos eredmény, az aláírt válaszokkal egyszer megkísérli a tartalék beküldést. Az egyébként beszámított eredményt nem POST-olja újra.
-- A befejezett játék mellett látható az `RESULT COUNTED ON THE SERVER`, a függő vagy hibás eredményrögzítés pedig egyértelmű figyelmeztetést kap. Ha a böngésző letiltotta a helyi tárolást, nem szabad bezárni a privát ablakot, amíg a szerver nem igazolta vissza.
+- A sikeres eredményrögzítést a szerver visszaigazolja, de külön sikerjelzés nem látható; a függő vagy hibás eredményrögzítés egyértelmű figyelmeztetést kap. Ha a böngésző letiltotta a helyi tárolást, nem szabad bezárni a privát ablakot, amíg a szerver nem igazolta vissza.
 - A backend **V18.0** és a 006-os adatbázis-migráció ajánlott és éles környezetben szükséges a két mentés tranzakciós garanciájához. A frontend változatlanul build nélküli; az azonnali kezdőoldal, az ARCHIVE, a Suggest POST és az egyedi hibaoldalak működnek.
 - A grafikon továbbra is csak az eredményképernyő első megjelenésekor, illetve kész nap betöltésekor kér friss statisztikát; egy nyitva hagyott másik böngészőablak görbéje nem követi élőben az inkognitóablak új eredményét.
 
