@@ -126,3 +126,10 @@ Változatlanul nincs buildlépés vagy böngészőbe beépített szerveradat / A
 - Eredményoldal, archívum, szabályzat, Suggest és a skeleton betöltési folyamat változatlan.
 - Nem kerül sor `user-scalable=no` használatára, ezért a böngésző saját akadálymentesítési nagyítása elérhető marad.
 - Módosított/felvett fájlok: `index.html`, `api.js`, `game.js`, `style.css`, `mobile-viewport.js`, `package.json`, új teszt. A backendhez nem kell hozzányúlni.
+
+
+## V18.5 – Egyképernyős megjelenítés különböző monitorméreteken
+
+Az új `desktop-viewport.js` a ténylegesen kirenderelt `#app` magasságát és szélességét méri, és **csak túllógás esetén** az alkalmazás saját CSS `zoom` értékét igazítja. A monitor/böngésző zoombeállításait és a hozzáférhetőséget nem módosítja. Játék, napváltás és eredményképernyő frissítése után is újaméri a méreteket; nem érinti a pontozást, a helyi 30 másodperces órát vagy a backend API-t. A 700 px-nél keskenyebb kijelzők élő játékfázisában továbbra is az eredeti, billentyűzetet kezelő `mobile-viewport.js` irányít, saját zoom nélküli rögzített kerettel.
+
+A `style.css` alacsonyabb asztali képernyőknél a díszítő margókat csökkenti. A vizuális ellenőrzéshez futtatható a `python tests/viewport-fit.browser.py`, amely 2560×1440-től 320×568-ig ellenőrzi a bevezető és az eredményképernyőt. A modálok és a hosszú válaszkatalógus **belső** görgethetősége megmarad a tartalom elérhetősége miatt. Nagyon kis kijelzőkön a teljes tartalom egy képernyőre illesztése szükségszerűen kisebb megjelenítést eredményezhet.

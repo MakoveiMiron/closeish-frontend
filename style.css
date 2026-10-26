@@ -1468,3 +1468,39 @@ html.closeish-session-blocked .concurrent-page{
 /* Storage was already warned on entry; keep it from covering the question
    while the player types. It reappears outside the timed round. */
 @media(max-width:700px){body.edge-playing #storageNotice{display:none!important}}
+
+/* V18.5: Responsive desktop height budget. Keep the same CLOSEISH composition
+   at 1080p and larger; trim decorative whitespace as monitors get shorter. */
+@media (min-width:701px) and (max-height:900px){
+ .topbar{height:clamp(57px,7.8vh,70px)}
+ .hero-inner{min-height:clamp(130px,21vh,180px);padding-top:16px;padding-bottom:15px}
+ .hero .hero-art{height:clamp(100px,15vh,130px)}
+ .hero h1{font-size:clamp(65px,7.7vw,105px);margin-top:6px;margin-bottom:2px}
+ .hero-sub{margin:7px 0;font-size:15px}
+ .ticker{padding:6px 0}.breakline{padding:7px;font-size:10px}
+ body.edge-intro .content{padding-top:16px;padding-bottom:18px}
+ body.edge-intro .start-screen{padding:22px 30px;gap:26px}
+ body.edge-intro .launch-copy h2{font-size:clamp(35px,3.7vw,52px);margin-bottom:10px}
+ body.edge-intro .launch-copy p{font-size:14px;margin-bottom:12px}
+ body.edge-intro .launch-copy .main-play{min-height:50px;padding:11px 20px}
+ body.edge-intro .launch-copy .intro-rules{padding-top:9px}
+ body.edge-intro .launch-guide{padding:13px 18px}
+ body.edge-intro .launch-stat{padding:9px 0}
+ body.edge-intro .launch-stat>strong{font-size:35px;min-width:86px}
+ body.edge-intro .launch-guide-title{padding-bottom:6px}
+ .footer{padding-top:10px;padding-bottom:10px}
+ body.edge-playing .content{padding-top:11px!important;padding-bottom:12px!important}
+ body.edge-playing .arena-content{padding-top:15px;padding-bottom:15px}
+ body.edge-playing .edge-composer{margin-top:14px}
+ .end-screen{padding:clamp(10px,2vh,23px)}
+}
+@media (max-width:700px) and (max-height:870px){
+ body.edge-intro .content{padding-top:8px;padding-bottom:8px}
+ body.edge-intro .start-screen{padding-top:12px;padding-bottom:12px}
+ body.edge-intro .launch-copy h2{margin-bottom:8px}
+ body.edge-intro .launch-copy p{margin-bottom:11px}
+ body.edge-intro .launch-guide{padding:11px 13px}
+ body.edge-intro .launch-stat{padding:9px 0}
+ body.edge-intro .launch-guide-title{padding-bottom:7px}
+ body.edge-intro .footer{padding-block:8px}
+}
