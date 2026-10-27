@@ -9,7 +9,8 @@
  if(!app)return;
  let raf=0,measuring=false,last=0;
  const viewport=()=>({w:Math.max(1,window.innerWidth),h:Math.max(1,window.innerHeight)});
- const mobileRound=()=>window.innerWidth<=700&&document.body.classList.contains('edge-playing');
+ const mobileLayout=()=>window.innerWidth<=700;
+ const hasDialog=()=>Boolean(document.querySelector('#modalWrap')); 
  function fits(w,h){
   const page=document.documentElement;
   // 2px tolerance allows rounded CSS shadows/borders; never clip essential text.
@@ -20,7 +21,7 @@
   if(measuring)return;
   measuring=true;
   try{
-   if(mobileRound()||root.classList.contains('closeish-session-blocked')){
+   if(mobileLayout()||hasDialog()||root.classList.contains('closeish-session-blocked')){
     app.style.zoom='';root.classList.remove('closeish-viewport-fit');last=1;return;
    }
    const {w,h}=viewport();

@@ -90,7 +90,7 @@ function question(id,action,fields={}){
  return action==='answer'?post(path,data):request(path+'?'+new URLSearchParams(data));
 }
 function loadScript(src){return new Promise((resolve,reject)=>{
- const script=document.createElement('script');script.async=false;script.src=src+'?v=18.3.0';script.onload=resolve;script.onerror=()=>reject(new Error('Could not load the game assets.'));document.head.appendChild(script);
+ const script=document.createElement('script');script.async=false;script.src=src+'?v=18.6.0';script.onload=resolve;script.onerror=()=>reject(new Error('Could not load the game assets.'));document.head.appendChild(script);
 })}
 // Paint the landing page from index.html before fetching ANY game-specific data.
 // Until game.js hydrates it, clicks are queued rather than lost; the clock only

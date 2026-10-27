@@ -133,3 +133,12 @@ Változatlanul nincs buildlépés vagy böngészőbe beépített szerveradat / A
 Az új `desktop-viewport.js` a ténylegesen kirenderelt `#app` magasságát és szélességét méri, és **csak túllógás esetén** az alkalmazás saját CSS `zoom` értékét igazítja. A monitor/böngésző zoombeállításait és a hozzáférhetőséget nem módosítja. Játék, napváltás és eredményképernyő frissítése után is újaméri a méreteket; nem érinti a pontozást, a helyi 30 másodperces órát vagy a backend API-t. A 700 px-nél keskenyebb kijelzők élő játékfázisában továbbra is az eredeti, billentyűzetet kezelő `mobile-viewport.js` irányít, saját zoom nélküli rögzített kerettel.
 
 A `style.css` alacsonyabb asztali képernyőknél a díszítő margókat csökkenti. A vizuális ellenőrzéshez futtatható a `python tests/viewport-fit.browser.py`, amely 2560×1440-től 320×568-ig ellenőrzi a bevezető és az eredményképernyőt. A modálok és a hosszú válaszkatalógus **belső** görgethetősége megmarad a tartalom elérhetősége miatt. Nagyon kis kijelzőkön a teljes tartalom egy képernyőre illesztése szükségszerűen kisebb megjelenítést eredményezhet.
+
+
+## V18.6 – mobilos elrendezés és kis monitoros felugró ablakok
+
+- **Csak a mobilos elrendezést** alakítottuk át (700 px-ig). A színek és az eredeti arculat változatlanok. Mobilon a kezdőlap kompakt, a mérőszámok egy sorba kerülnek, a kérdésmező és az időzítő a látható képernyőn marad.
+- A napi eredmény mobilon három választható, egyképernyős nézetet használ: **RESULT / STATS / ANSWERS**. A válaszkatalógus táblázata a panelen belül görgethető, maga az oldal nem.
+- Az Archive, How to Play, Suggest és a pontos ponthistogram ablak a kijelző tényleges méretéhez illeszkedik. A felugró ablak nem örökli az oldal automatikus kicsinyítését.
+- A szövegmezőnél a mobilos billentyűzet nyitása továbbra is a látható viewportot használja. A 30 másodperces számláló működése nem változott.
+- Ellenőrzés: `python tests/layout-mobile-v186.browser.py` és `python tests/ui.mobile.mock.py` (Playwright, Chromium).

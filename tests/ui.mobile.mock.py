@@ -70,6 +70,7 @@ with sync_playwright() as p:
  assert page.evaluate('window.__calls.answers.length')==6
  assert page.evaluate('window.__calls.completed')>=1
  assert page.locator('.run-answers .book-launch').count()==6
+ page.locator('[data-mobile-end-tab="answers"]').click()
  page.locator('[data-open-book="0"]').click()
  page.locator('.run-answers .catalogue-question').wait_for()
  page.locator('[data-rows="0"]').wait_for(state='attached')
@@ -77,9 +78,11 @@ with sync_playwright() as p:
  assert page.locator('#replayBtn').count()==0
  assert page.get_by_text('REPLAY DAY').count()==0
  assert page.evaluate("localStorage.getItem('closeish-pending-v1')") is None
+ page.locator('[data-mobile-end-tab="summary"]').click()
  assert page.locator('.end-score').is_visible()
  assert page.locator('[data-exact-counts]').count()==1
  assert page.locator('.end-screen .exact-count-table').count()==0
+ page.locator('[data-mobile-end-tab="stats"]').click()
  page.locator('[data-exact-counts]').click()
  assert page.get_by_role('dialog',name='DAILY SCORE COUNTS').count()==1
  assert page.locator('.modal-stats .exact-count-table tbody tr').count()==37
@@ -91,7 +94,8 @@ with sync_playwright() as p:
  page.locator('[data-modal="rules"]').first.click(force=True)
  assert page.get_by_text('Eligibility comes first').count()==0
  page.locator('#closeModal').click()
- assert page.locator('.footer').inner_text().endswith('Wildly specific limits. Free-text answers. No ads.')
+ assert 'CLOSEISH / KNOW YOUR LIMITS.' in page.locator('.footer').inner_text()
+ page.locator('[data-mobile-end-tab="summary"]').click()
  heights=page.locator('.run-summary .btnrow .cta').evaluate_all('(els)=>els.map(e=>Math.round(e.getBoundingClientRect().height))')
  assert len(heights)==2 and len(set(heights))==1, heights
  page.locator('#homeBtn').click()
