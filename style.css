@@ -1782,3 +1782,112 @@ html.closeish-session-blocked .concurrent-page{
  body.edge-intro .playgrid,body.edge-intro #gameArea{flex:0 0 auto!important;height:auto!important;align-self:stretch}
  body.edge-intro .start-screen{height:auto!important}
 }
+
+
+/* V18.7 — minimal footer and contact dialog. Existing palette and desktop game are unchanged. */
+.footer{gap:16px;justify-content:space-between}
+.footer-name{font:800 11px/1.2 var(--mono);letter-spacing:.06em}
+.footer-privacy{display:inline-flex;align-items:center;min-height:30px;padding:3px 0;
+ text-decoration:underline;text-underline-offset:4px;white-space:nowrap;font:800 11px/1.3 var(--mono)}
+.footer-privacy:hover{color:var(--blue)}
+.modal-contact{width:min(565px,calc(100vw - 30px))!important}
+.modal-contact .modalcontent{padding:clamp(14px,3vw,28px)}
+.contact-panel{max-width:510px}
+.contact-intro-tag{display:inline-block;padding:5px 9px;background:var(--pink);
+ border:2px solid var(--ink);border-radius:6px;font:800 10px var(--mono);letter-spacing:.09em}
+.modal-contact .contact-panel h3{font:900 clamp(28px,4vw,42px)/.99 var(--display);
+ letter-spacing:-.04em;margin:12px 0 13px}
+.contact-panel>p{font-size:clamp(12px,1.8vw,14px);line-height:1.5;margin:8px 0}
+.contact-email-block{margin:18px 0 8px;border:2px solid var(--ink);background:var(--lemon);
+ border-radius:9px;padding:13px 16px;display:flex;flex-direction:column;gap:6px}
+.contact-email-block>span{font:800 10px var(--mono);letter-spacing:1px}
+.contact-mail{font:900 clamp(16px,3.3vw,24px)/1.15 var(--display);
+ color:var(--ink);overflow-wrap:anywhere;text-decoration:none}
+.contact-mail:hover{text-decoration:underline;text-underline-offset:3px}
+.modal-contact .contact-panel .contact-small{font:500 10px/1.45 var(--mono);color:var(--muted);margin-top:11px}
+@media(max-width:700px){
+ .mainnav{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+ .mainnav:has(#todayNav){grid-template-columns:repeat(5,minmax(0,1fr))!important}
+ .mainnav .navbutton{font-size:clamp(7px,2vw,9px)!important;padding-inline:2px!important}
+ .mainnav:has(#todayNav) .navbutton{font-size:clamp(6px,1.75vw,8px)!important}
+ .footer,body.edge-ended .footer{justify-content:space-between!important;flex-wrap:nowrap!important;
+  text-align:left!important;padding-inline:10px!important}
+ .footer-name,.footer-privacy{font-size:9px!important;display:inline-flex!important}
+ .modal-contact .modalcontent{padding:14px!important}
+ .modal-contact .contact-panel h3{font-size:27px}
+ .contact-panel>p{font-size:12px}
+ .contact-email-block{margin-top:13px;padding:11px}
+ .contact-mail{font-size:19px}
+}
+@media(max-height:590px){
+ .modal-contact .modalcontent{padding:10px 15px}
+ .modal-contact .contact-panel h3{font-size:25px;margin:8px 0}
+ .contact-panel>p{font-size:11px;line-height:1.35;margin:7px 0}
+ .contact-email-block{margin:9px 0 5px;padding:9px 11px}
+ .contact-mail{font-size:19px}
+}
+
+/* Separate privacy-policy reading page, intentionally scrollable for accessibility. */
+body.privacy-page{min-width:320px;overflow:auto;max-width:none}
+.privacy-page .policy-header{border-bottom:2px solid var(--ink);background:var(--lemon)}
+.privacy-page .policy-head-inner{max-width:900px;margin:auto;display:flex;align-items:center;
+ justify-content:space-between;gap:15px;padding:16px 22px}
+.privacy-page .policy-brand{font:900 24px var(--display);letter-spacing:-1px;text-decoration:none}
+.privacy-page .policy-back{font:800 11px var(--mono);text-underline-offset:3px}
+.privacy-page .policy-main{max-width:900px;margin:30px auto 60px;padding:0 22px}
+.privacy-page .policy-title{font:900 clamp(38px,7vw,64px)/1 var(--display);letter-spacing:-.05em;margin:8px 0}
+.privacy-page .policy-meta{font:700 11px var(--mono);color:var(--muted);margin:5px 0 23px}
+.privacy-page .policy-lead{font-size:17px;line-height:1.55;max-width:750px}
+.privacy-page .policy-section{margin:24px 0 0;padding:20px 22px;background:var(--paper);
+ border:2px solid var(--ink);border-radius:11px;box-shadow:3px 3px 0 var(--ink)}
+.privacy-page h2{font:900 23px/1.1 var(--display);margin:0 0 12px;letter-spacing:-.02em}
+.privacy-page p,.privacy-page li{font-size:14px;line-height:1.65}
+.privacy-page li+li{margin-top:8px}
+.privacy-page ul{padding-left:24px;margin:9px 0}
+.privacy-page .policy-action{background:var(--pink);border:2px solid var(--ink);
+ padding:10px 14px;margin:13px 0;border-radius:7px;font-weight:700}
+.privacy-page .policy-footer{font:700 11px var(--mono);text-align:center;margin:30px auto}
+@media(max-width:500px){.privacy-page .policy-main{padding:0 13px;margin-top:22px}
+ .privacy-page .policy-head-inner{padding:12px 14px}.privacy-page .policy-section{padding:16px}}
+
+/* V18.8: dialog inner backgrounds must be clipped by the rounded outside border.
+   The head is fixed inside the dialog; content only becomes internally scrollable
+   if a genuinely tiny display or accessibility zoom makes fitting impossible. */
+.modalwrap{box-sizing:border-box;overscroll-behavior:contain}
+.modalwrap .modal{box-sizing:border-box;min-width:0;max-width:calc(100vw - 18px);
+ max-height:calc(100dvh - 18px);display:flex;flex-direction:column;
+ overflow:hidden!important;border-radius:16px;isolation:isolate}
+.modalwrap .modalhead{position:relative;top:auto;flex:0 0 auto;min-width:0}
+.modalwrap .modalcontent{flex:1 1 auto;min-height:0;min-width:0;
+ overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}
+.modalwrap .modal.dialog-keyboard{overflow:hidden!important}
+.modalwrap .modal.dialog-keyboard .modalcontent{overflow-y:auto}
+.modalwrap .modal-stats{width:min(520px,calc(100vw - 18px));}
+.modal-stats .modalcontent{padding:14px 18px 16px;overflow:hidden}
+.score-band-panel{min-width:0;display:flex;flex-direction:column;gap:8px}
+.score-band-panel .exact-count-intro{margin:0;font:600 11px/1.4 var(--body)}
+.score-band-table-shell{min-width:0;border:2px solid var(--ink);border-radius:9px;overflow:hidden}
+.score-band-table-shell .exact-count-table{border:0;border-radius:0;width:100%;font:650 12px/1.25 var(--mono);border-collapse:collapse}
+.score-band-table-shell .exact-count-table th,.score-band-table-shell .exact-count-table td{width:50%}
+.score-band-table-shell .exact-count-table thead th{padding:8px 13px;border-bottom:2px solid var(--ink);font-size:10px}
+.score-band-table-shell .exact-count-table tbody th,.score-band-table-shell .exact-count-table td{padding:5px 13px}
+.score-band-table-shell .exact-count-table tbody tr:last-child th,.score-band-table-shell .exact-count-table tbody tr:last-child td{border-bottom:0}
+.score-band-pages{display:flex;align-items:center;justify-content:space-between;gap:9px;font:800 11px/1.3 var(--mono)}
+.score-band-pages button{border:2px solid var(--ink);background:var(--lemon);border-radius:7px;padding:8px 11px;font:900 10px var(--mono);cursor:pointer}
+.score-band-pages button:disabled{opacity:.45;cursor:default}
+.score-band-pages span{text-align:center;white-space:nowrap}
+.score-band-pages small{font:600 9px var(--mono);opacity:.65}
+@media(max-width:700px){
+ .modalwrap .modal{max-width:calc(100vw - 12px);border-radius:15px}
+ .modal-stats .modalcontent{padding:10px 11px 12px!important}
+ .score-band-panel{gap:7px}
+ .score-band-table-shell .exact-count-table{font-size:11px}
+ .score-band-table-shell .exact-count-table thead th{font-size:9px;padding:6px 9px}
+ .score-band-table-shell .exact-count-table td,.score-band-table-shell .exact-count-table tbody th{padding:4px 9px}
+ .score-band-pages button{padding:7px 8px;font-size:9px}
+ .score-band-pages small{font-size:8px}
+}
+@media(max-height:600px){
+ .score-band-table-shell .exact-count-table td,.score-band-table-shell .exact-count-table tbody th{padding-block:3px}
+ .score-band-panel .exact-count-intro{font-size:10px;line-height:1.3}
+}

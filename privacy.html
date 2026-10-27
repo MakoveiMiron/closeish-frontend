@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f8f5ee">
+<meta name="description" content="How CLOSEISH processes player progress, results, submitted question ideas and browser storage.">
+<title>Privacy Policy — CLOSEISH</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css?v=18.8.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'none'">
+</head>
+<body class="privacy-page">
+<header class="policy-header"><div class="policy-head-inner"><a href="/" class="policy-brand">CLOSEISH</a><a class="policy-back" href="/">← BACK TO THE GAME</a></div></header>
+<main class="policy-main">
+ <div class="micro">YOUR DATA / NO ADS</div>
+ <h1 class="policy-title">PRIVACY POLICY.</h1>
+ <p class="policy-meta">CLOSEISH · Version 1.0 · Updated 27 October 2026</p>
+ <p class="policy-lead">CLOSEISH is a daily question game. This policy explains the information needed to run the game, keep a player's progress, show aggregated scores and receive question suggestions. The game does not have user accounts and its application code does not use advertising or analytics trackers.</p>
+ <section class="policy-section" aria-labelledby="controller"><h2 id="controller">01 / WHO OPERATES CLOSEISH?</h2>
+  <p>The person or organisation responsible for processing personal data is the operator of CLOSEISH (<a href="https://closeish.eu/">closeish.eu</a>).</p>
+  <p class="policy-action"><strong>Operator's legal name and postal address:</strong> [TO BE COMPLETED BY THE OPERATOR BEFORE PUBLICATION]</p>
+  <p>Contact for privacy enquiries and rights requests: <a href="mailto:contact@closeish.eu">contact@closeish.eu</a>.</p>
+ </section>
+ <section class="policy-section" aria-labelledby="data"><h2 id="data">02 / WHAT INFORMATION IS PROCESSED?</h2>
+  <ul>
+   <li><strong>Player identifier:</strong> Your browser creates a random UUID to recognise the same player across visits, without requiring your name or an account. The API receives this UUID; the PostgreSQL database stores a keyed cryptographic hash of it, not the plain UUID.</li>
+   <li><strong>Game progress:</strong> For each day, the database can store the game date, current round, server-generated run identifier, answer text and scored results (including the points earned, outcome and timing/status of a round), plus update or completion timestamps.</li>
+   <li><strong>Results and statistics:</strong> The backend stores one official completion/score per player and day and maintains aggregate score distributions. Public statistics are presented as totals and distributions, not lists of identifiable players.</li>
+   <li><strong>Question suggestions:</strong> If you use SUGGEST, your proposed question, chosen direction, submission timestamp and review status are saved privately. The suggestion form does not request your email address or player identity.</li>
+   <li><strong>Network and security data:</strong> The backend temporarily uses a network IP address for per-minute request limits and per-hour suggestion limits in server memory. Network operators and hosting providers may process technical connection details and access logs.</li>
+   <li><strong>Messages sent by email:</strong> If you contact us, your sender address, message and any information you include will be processed to respond. Sending an email is handled by your email service and our mail provider, not by the game's Suggest form.</li>
+  </ul>
+ </section>
+ <section class="policy-section" aria-labelledby="storage"><h2 id="storage">03 / BROWSER STORAGE &amp; COOKIES</h2>
+  <p>The current CLOSEISH application code does <strong>not</strong> set advertising or analytics cookies and does not install third-party tracking scripts. It uses the browser's <strong>localStorage</strong> for the requested game's operation:</p>
+  <ul>
+   <li><strong>closeish-player-v1:</strong> random player UUID, used to retrieve the same saved game.</li>
+   <li><strong>closeish-pending-v1:</strong> unsynchronised round/answer information, so an interrupted network connection does not immediately lose a submitted response.</li>
+   <li><strong>Local startup/view hints and delivery queues:</strong> minimal display state, restore hints, and pending completion records or error details required for resilience and synchronisation.</li>
+  </ul>
+  <p>These values can remain until cleared by the application or through your browser's site-data controls. Clearing storage will generate a new player UUID and may break access to earlier progress, since there is no account-based recovery.</p>
+  <p>Because these storage uses support the game and its continuity rather than tracking, CLOSEISH does not ask you to accept optional cookies it does not set. If non-essential analytics, ads or other tracking storage are added later, they must be separately assessed and, where required, disabled until valid consent is obtained. Additional storage or cookies imposed by a hosting layer must be checked against its actual production configuration.</p>
+ </section>
+ <section class="policy-section" aria-labelledby="purpose"><h2 id="purpose">04 / PURPOSES &amp; LEGAL GROUNDS</h2>
+  <ul>
+   <li><strong>Play, continuity and scoring:</strong> providing the game you requested, preventing replay/duplicate scores, restoring unfinished games and showing daily statistics. Legal basis: legitimate interests in providing a reliable, fair game (GDPR Article 6(1)(f)).</li>
+   <li><strong>Security and rate limiting:</strong> protecting the service against abuse. Legal basis: legitimate interests in security and service integrity (Article 6(1)(f)).</li>
+   <li><strong>Suggestions:</strong> receiving and reviewing voluntarily submitted question ideas. Legal basis: legitimate interests in improving the game (Article 6(1)(f)).</li>
+   <li><strong>Enquiries and commercial discussions:</strong> replying to email requests; where a user initiates steps toward a potential transaction, steps prior to a contract may be relevant (Article 6(1)(b)); otherwise legitimate interests in handling correspondence (Article 6(1)(f)).</li>
+  </ul>
+  <p>You do not have to send question suggestions or emails. A functional player ID is necessary to preserve server-side progress and prevent a completed day from being submitted repeatedly.</p>
+ </section>
+ <section class="policy-section" aria-labelledby="recipients"><h2 id="recipients">05 / PROVIDERS &amp; DATA LOCATION</h2>
+  <p>The game API and PostgreSQL database are configured for deployment through <strong>Railway</strong>. Static-site hosting, network providers and email providers may also handle information needed to deliver their services. The specific static host, email provider, active Railway deployment region, processor terms and any international transfer safeguards must be verified by the operator against the live configuration.</p>
+  <p>The game does not sell player data or share individual answers with advertising networks. Where a provider processes personal data on our behalf, appropriate GDPR processor terms and transfer safeguards must be in place.</p>
+ </section>
+ <section class="policy-section" aria-labelledby="retention"><h2 id="retention">06 / HOW LONG ARE RECORDS KEPT?</h2>
+  <p>The supplied backend currently does <strong>not</strong> implement automatic expiry/deletion of player progress, official daily results or stored suggestions. These records may remain until deleted through database administration. Local browser values persist until cleared or overwritten. In-memory request limits expire by minute; suggestion rate-limit entries expire by hour, with stale entries cleared during later requests.</p>
+  <p>The operator must establish and publish a concrete retention/deletion schedule and a process for handling deletion requests before deploying the final privacy notice. Email and infrastructure-log retention depends on the operator's actual service providers and settings.</p>
+ </section>
+ <section class="policy-section" aria-labelledby="rights"><h2 id="rights">07 / YOUR RIGHTS</h2>
+  <p>Depending on the circumstances, under the GDPR you may request access, correction, deletion, restriction or portability of personal data, and object to processing based on legitimate interests. You may also lodge a complaint with your competent supervisory authority, including the Hungarian <a href="https://naih.hu/" target="_blank" rel="noopener noreferrer">NAIH</a>.</p>
+  <p>Email <a href="mailto:contact@closeish.eu">contact@closeish.eu</a> with a privacy request. Because there is no account or identity verification, we may need limited information to locate your pseudonymous player record without disclosing another player's data. Browser site data can be cleared directly using your browser's settings.</p>
+ </section>
+ <section class="policy-section" aria-labelledby="changes"><h2 id="changes">08 / UPDATES</h2>
+  <p>This notice describes the frontend V18.8 and the uploaded backend source reviewed on 27 October 2026, not an independent audit of a live hosting environment. Material changes to storage, analytics or data recipients require an update to this notice, and any newly required consent must be obtained before the relevant processing starts.</p>
+ </section>
+ <div class="policy-footer"><a href="/">BACK TO CLOSEISH ↗</a></div>
+</main>
+</body>
+</html>

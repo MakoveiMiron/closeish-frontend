@@ -142,3 +142,13 @@ A `style.css` alacsonyabb asztali képernyőknél a díszítő margókat csökke
 - Az Archive, How to Play, Suggest és a pontos ponthistogram ablak a kijelző tényleges méretéhez illeszkedik. A felugró ablak nem örökli az oldal automatikus kicsinyítését.
 - A szövegmezőnél a mobilos billentyűzet nyitása továbbra is a látható viewportot használja. A 30 másodperces számláló működése nem változott.
 - Ellenőrzés: `python tests/layout-mobile-v186.browser.py` és `python tests/ui.mobile.mock.py` (Playwright, Chromium).
+
+
+## V18.8 – Contact, adatvédelem és mobil/desktop modálok
+
+- A felső navigáció CONTACT gombja megnyitja a kapcsolatfelvételi ablakot. E-mail: contact@closeish.eu (mailto; nincs üzenetküldő backend).
+- A láblécből kikerültek a korábbi szlogenek; PRIVACY POLICY hivatkozás került a helyükre.
+- A privacy.html a játék tényleges localStorage/PostgreSQL használatának áttekintésén alapul. A PRIVACY-DEPLOYMENT-CHECKLIST-HU.md publikálás előtti hiányzó jogi/üzemeltetési adatokra figyelmeztet.
+- A felugró ablakok belső színrétegei nem lógnak túl a lekerekített sarkokon. A normál kijelzőkön minden tartalom látható; nagyon rövid képernyőn az elérhetőség miatt szükség esetén csak a modal tartalma görgethető.
+- A DAILY SCORE BANDS modál az API-ból érkező pontos eredményszámokat egyetlen, lapozható táblázatban mutatja: 0–200, 201–400, ..., 7001–7200 pont. A számok nem becslések, a backend hisztogramjából származnak.
+- Más backend API-t vagy adatbázisváltozást nem igényel.

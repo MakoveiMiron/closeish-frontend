@@ -79,7 +79,7 @@ def run_case(browser,completed,legacy=False):
  assert page.get_by_role('dialog',name='HOW TO PLAY').count()==1
  page.locator('#closeModal').click()
  page.locator('[data-exact-counts]').click()
- assert page.get_by_role('dialog',name='DAILY SCORE COUNTS').count()==1
+ assert page.get_by_role('dialog',name='DAILY SCORE BANDS').count()==1
  page.locator('#closeModal').click()
  page.locator('[data-modal="archive"]').first.click()
  page.locator('#closeModal').click()

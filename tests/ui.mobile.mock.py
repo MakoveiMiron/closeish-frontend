@@ -84,9 +84,9 @@ with sync_playwright() as p:
  assert page.locator('.end-screen .exact-count-table').count()==0
  page.locator('[data-mobile-end-tab="stats"]').click()
  page.locator('[data-exact-counts]').click()
- assert page.get_by_role('dialog',name='DAILY SCORE COUNTS').count()==1
- assert page.locator('.modal-stats .exact-count-table tbody tr').count()==37
- assert page.locator('.modal-stats .exact-count-table').count()>=2
+ assert page.get_by_role('dialog',name='DAILY SCORE BANDS').count()==1
+ assert 1 <= page.locator('.modal-stats .exact-count-table tbody tr').count() <= 18
+ assert page.locator('.modal-stats .exact-count-table').count()==1
  assert page.locator('.modal-stats .exact-count-scroll').count()==0
  assert page.locator('.modal-stats').evaluate('(e)=>e.scrollHeight<=e.clientHeight')
  page.keyboard.press('Escape')
@@ -94,7 +94,7 @@ with sync_playwright() as p:
  page.locator('[data-modal="rules"]').first.click(force=True)
  assert page.get_by_text('Eligibility comes first').count()==0
  page.locator('#closeModal').click()
- assert 'CLOSEISH / KNOW YOUR LIMITS.' in page.locator('.footer').inner_text()
+ assert 'PRIVACY POLICY' in page.locator('.footer').inner_text()
  page.locator('[data-mobile-end-tab="summary"]').click()
  heights=page.locator('.run-summary .btnrow .cta').evaluate_all('(els)=>els.map(e=>Math.round(e.getBoundingClientRect().height))')
  assert len(heights)==2 and len(set(heights))==1, heights
@@ -104,6 +104,6 @@ with sync_playwright() as p:
  assert page.locator('#startBtn').count()==0
  assert page.evaluate('window.__calls.answers.length')==6
  print(json.dumps({'passed':True,'sixSkippedAndSigned':True,'catalogueAfterCompletion':True,
-                   'timerDeadlinePersisted':True,'replayRemoved':True,'modal37ExactCounts':True,
+                   'timerDeadlinePersisted':True,'replayRemoved':True,'modalScoreBands':True,
                    'rulesShortened':True,'buttonsSameHeight':True,'completedDayLocked':True},indent=2))
  browser.close()

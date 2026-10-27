@@ -1,4 +1,4 @@
-"""V18.4: responsive score distribution and silent successful save. Chromium and Playwright."""
+"""V18.8: one responsive paginated score-band table, exact aggregated player totals."""
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
@@ -26,8 +26,17 @@ with sync_playwright() as pw:
    page.add_script_tag(content=(ROOT/script).read_text())
   assert page.locator('.end-screen').count()==1,(w,h)
   assert page.locator('.run-summary .result-sync').count()==0,(w,h)
+  if w<=700:page.locator('[data-mobile-end-tab=stats]').click()
   page.locator('[data-exact-counts]').click()
-  assert page.locator('.modal-stats .exact-count-table tbody tr').count()==37,(w,h)
+  assert page.locator('.modal-stats .exact-count-table').count()==1,(w,h)
+  bands=[]
+  while True:
+   bands.extend(page.locator('.modal-stats .exact-count-table tbody tr').all_inner_texts())
+   if page.locator('[data-score-page=next]').is_disabled():break
+   page.locator('[data-score-page=next]').click()
+  assert len(bands)==36,(w,h,len(bands))
+  assert bands[0].startswith('0–200') and bands[1].startswith('201–400') and bands[-1].startswith('7,001–7,200'),(w,h,bands)
+  assert sum(int(r.split('\t')[-1].replace(',','')) for r in bands)==sum(x['count'] for x in RESULT['histogram']),(w,h,bands)
   assert page.locator('.exact-count-scroll').count()==0
   metrics=page.evaluate('''() => {let modal=document.querySelector('.modal-stats'), tables=[...document.querySelectorAll('.exact-count-table')],bounds=modal.getBoundingClientRect();return {modalTop:bounds.top,modalBottom:bounds.bottom,modalScroll:modal.scrollHeight,modalHeight:modal.clientHeight,cols:tables.length,rows:tables.map(t=>t.rows.length-1),maxRight:Math.max(...tables.map(t=>t.getBoundingClientRect().right)),maxBottom:Math.max(...tables.map(t=>t.getBoundingClientRect().bottom)),minLeft:Math.min(...tables.map(t=>t.getBoundingClientRect().left)),viewportWidth:innerWidth,viewportHeight:innerHeight}}''')
   assert not errors,(w,h,errors)
@@ -36,7 +45,7 @@ with sync_playwright() as pw:
   assert metrics['maxBottom']<=metrics['modalBottom']+1,(w,h,metrics)
   assert metrics['minLeft']>=0 and metrics['maxRight']<=w+1,(w,h,metrics)
   if (w,h) in [(1725,862),(320,568)]:
-   page.screenshot(path=f'/mnt/data/closeish-v18.4-build/scores-{w}x{h}.png')
+   page.screenshot(path=str(ROOT.parent/f'scores-{w}x{h}.png'))
   print('PASS',w,h,metrics)
   page.close()
  browser.close()

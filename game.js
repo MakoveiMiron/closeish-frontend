@@ -396,7 +396,7 @@ function dailyStatsHTML(){
  const d=globalThis.CLOSEISHChart.distribution(data,data.official?.score??scoreSoFar());
  const comparison=data.comparison,pct=comparison?.betterThanPercent;
  const legacy=!data.official&&!state.pending;
- const details=`<button type="button" class="chart-data-open" data-exact-counts aria-haspopup="dialog">VIEW EXACT SCORE COUNTS <span aria-hidden="true">↗</span></button>`;
+ const details=`<button type="button" class="chart-data-open" data-exact-counts aria-haspopup="dialog">VIEW SCORE BANDS <span aria-hidden="true">↗</span></button>`;
  return `<section class="mock-stat-card" aria-label="Daily score distribution" aria-live="polite">${heading}${data.mode==='memory'?'<p class="chart-note"><b>LOCAL TEST DATA — resets on server restart</b></p>':''}<div class="chart-scorecards"><div class="chart-your"><span>${data.official?'COUNTED SCORE':'YOUR SCORE'}</span><strong>${formatScore(d.score)}<small> / 7200</small></strong></div><div class="chart-average"><span>DAILY AVERAGE</span><strong>${formatNum(Math.round(d.mean))}<small> pts</small></strong></div><div class="chart-percentile"><span>SCORED HIGHER THAN</span><strong>${pct==null?'—':pct.toFixed(1)}<small>${pct==null?'':'%'}</small></strong><small>${pct==null?(comparison?'Waiting for another player':'No counted score yet'):'of the other '+formatNum(comparison.others)+(comparison.others===1?' player':' players')}</small></div></div><div class="chart-canvas">${globalThis.CLOSEISHChart.svg(d)}${globalThis.CLOSEISHChart.svg(d,true)}</div><div class="chart-legend"><span><i class="legend-profile"></i>Smoothed distribution</span><span><i class="legend-average"></i>Daily average</span><span><i class="legend-you"></i>${data.official?'Counted score':'Your score'}</span></div><p class="chart-note"><b>${formatNum(data.total)} completed games</b> · ${escapeHTML(data.date)}. Ties do not count as beaten. You are excluded from your comparison. The curve is smoothed; percentages use exact scores.</p>${data.revision!==BOOT.revision?'<p class="chart-note">Showing the question version of your counted result.</p>':''}${legacy?'<p class="chart-note">This saved run has no verified completion. It is not included in the comparison.</p>':''}${note?`<p class="chart-note">${escapeHTML(note)}</p>`:''}<div class="chart-quartiles"><div><span>LOWER QUARTILE</span><strong>${formatNum(d.q25)}</strong><small>25th percentile</small></div><div><span>MEDIAN SCORE</span><strong>${formatNum(d.median)}</strong><small>50th percentile</small></div><div><span>UPPER QUARTILE</span><strong>${formatNum(d.q75)}</strong><small>75th percentile</small></div></div>${details}</section>`;
 }
 
@@ -500,32 +500,65 @@ function exactCountColumnCount(rowCount){
  const neededColumns=Math.ceil(rowCount/availableRows);
  return Math.max(1,Math.min(maxColumns,Math.max(comfortableColumns,neededColumns)));
 }
+// The backend supplies exact counts for scores 0, 200, ... 7200.
+// Display the user-requested disjoint 200-point bands in ONE paginated table.
+let scoreBandPage=0;
+function scoreBandPageSize(){
+ const h=window.visualViewport?.height||window.innerHeight;
+ return h<550?9:h<650?12:h<850?16:18;
+}
 function exactScoresModalHTML(){
  const stats=Stats.state(BOOT.date).data;
  if(!stats?.histogram?.length)return '<p class="chart-note">Daily score counts are not available yet.</p>';
- const rows=stats.histogram;
- const columns=exactCountColumnCount(rows.length);
- const baseSize=Math.floor(rows.length/columns);
- const extra=rows.length%columns;
- const tables=Array.from({length:columns},(_,i)=>{
-  const offset=i*baseSize+Math.min(i,extra);
-  const part=rows.slice(offset,offset+baseSize+(i<extra?1:0));
-  if(!part.length)return '';
-  return `<table class="exact-count-table"><thead><tr><th scope="col">SCORE</th><th scope="col">PLAYERS</th></tr></thead><tbody>${part.map(row=>`<tr><th scope="row">${formatScore(row.score)}</th><td class="${String(row.count).length>4?'exact-count-long':''}">${formatNum(row.count)}</td></tr>`).join('')}</tbody></table>`;
- }).join('');
- return `<p class="exact-count-intro"><strong>${formatNum(stats.total||0)}</strong> completed games · ${escapeHTML(stats.date||BOOT.date)}. Each possible score is shown separately.</p><div class="exact-count-grid" style="--exact-columns:${columns}" aria-label="All exact daily score counts">${tables}</div>`;
+ const counts=new Map();
+ for(const {score,count} of stats.histogram){
+  const key=Number(score),value=Number(count);
+  if(Number.isInteger(key)&&key>=0&&key<=7200&&key%200===0&&Number.isFinite(value)&&value>=0)
+   counts.set(key,(counts.get(key)||0)+value);
+ }
+ const bands=Array.from({length:36},(_,i)=>{
+  const from=i===0?0:i*200+1,to=(i+1)*200;
+  const count=i===0?(counts.get(0)||0)+(counts.get(200)||0):(counts.get(to)||0);
+  return {from,to,count};
+ });
+ const pageSize=scoreBandPageSize(),pages=Math.ceil(bands.length/pageSize);
+ scoreBandPage=Math.min(Math.max(0,scoreBandPage),pages-1);
+ const shown=bands.slice(scoreBandPage*pageSize,(scoreBandPage+1)*pageSize);
+ const body=shown.map(b=>`<tr><th scope="row">${formatNum(b.from)}–${formatNum(b.to)}</th><td>${formatNum(b.count)}</td></tr>`).join('');
+ const total=Array.from(counts.values()).reduce((a,b)=>a+b,0);
+ const pageText=`${scoreBandPage+1} / ${pages}`;
+ return `<div class="score-band-panel"><p class="exact-count-intro"><strong>${formatNum(total)}</strong> completed games · ${escapeHTML(stats.date||BOOT.date)}. Each player belongs to exactly one score band.</p>`+
+ `<div class="score-band-table-shell"><table class="exact-count-table" aria-label="Daily score bands and number of players"><thead><tr><th scope="col">SCORE RANGE (PTS)</th><th scope="col">PLAYERS</th></tr></thead><tbody>${body}</tbody></table></div>`+
+ `<nav class="score-band-pages" aria-label="Score band pages"><button type="button" data-score-page="prev" ${scoreBandPage===0?'disabled':''} aria-label="Previous score bands">← PREV</button><span aria-live="polite">${pageText} <small>· ${bands.length} BANDS</small></span><button type="button" data-score-page="next" ${scoreBandPage===pages-1?'disabled':''} aria-label="Next score bands">NEXT →</button></nav></div>`;
 }
+
+function contactHTML(){return `<section class="contact-panel" aria-labelledby="contactHeading">
+ <div class="contact-intro-tag">LET'S TALK.</div>
+ <h3 id="contactHeading">GOT SOMETHING<br>IN MIND?</h3>
+ <p>Interested in CLOSEISH? Have a question, an idea, or feedback about the game? I'd love to hear from you.</p>
+ <p>I'm also open to discussing collaborations, business opportunities, or a potential acquisition of CLOSEISH.</p>
+ <div class="contact-email-block"><span>GET IN TOUCH</span><a class="contact-mail" href="mailto:contact@closeish.eu">contact@closeish.eu ↗</a></div>
+ <p class="contact-small">Email opens your default email app. There is no contact form or message storage on this page.</p>
+ </section>`;}
 function modalHTML(){
  if(!showModal)return '';
  const community=globalThis.CLOSEISHCommunity;
- const content=showModal==='rules'?community.guideHTML():showModal==='suggest'?community.suggestionHTML():showModal==='archive'?calendarHTML():showModal==='stats'?exactScoresModalHTML():'<h3>THE DAILY GAME OF LIMITS.</h3><p>Six questions. One edge.</p>';
- const title=showModal==='rules'?'HOW TO PLAY':showModal==='suggest'?'SUGGEST A QUESTION':showModal==='archive'?'ARCHIVE':showModal==='stats'?'DAILY SCORE COUNTS':'ABOUT CLOSEISH';
+ const content=showModal==='rules'?community.guideHTML():showModal==='suggest'?community.suggestionHTML():showModal==='archive'?calendarHTML():showModal==='stats'?exactScoresModalHTML():showModal==='contact'?contactHTML():'<h3>THE DAILY GAME OF LIMITS.</h3><p>Six questions. One edge.</p>';
+ const title=showModal==='rules'?'HOW TO PLAY':showModal==='suggest'?'SUGGEST A QUESTION':showModal==='archive'?'ARCHIVE':showModal==='stats'?'DAILY SCORE BANDS':showModal==='contact'?'CONTACT':'ABOUT CLOSEISH';
  return `<div class="modalwrap" id="modalWrap"><div class="modal modal-${showModal}" role="dialog" aria-modal="true" aria-labelledby="overlayTitle"><div class="modalhead"><strong id="overlayTitle">${title}</strong><button id="closeModal" class="closebtn" aria-label="Close">×</button></div>${phase==='play'?'<div class="modal-timer-note" role="note">Your round timer keeps running while this is open.</div>':''}<div class="modalcontent">${content}</div></div></div>`;
+}
+
+function bindBandPageButtons(holder){
+ holder.querySelectorAll('[data-score-page]').forEach(b=>b.addEventListener('click',()=>{
+  scoreBandPage+=b.dataset.scorePage==='next'?1:-1;
+  holder.innerHTML=exactScoresModalHTML();bindBandPageButtons(holder);
+  globalThis.CLOSEISHDialogViewport?.sync();
+ }));
 }
 window.addEventListener('resize',()=>{
  if(showModal!=='stats')return;
  const content=document.querySelector('.modal-stats .modalcontent');
- if(content)content.innerHTML=exactScoresModalHTML();
+ if(content){content.innerHTML=exactScoresModalHTML();bindBandPageButtons(content)}
 });
 document.addEventListener('keydown',event=>{
  if(!showModal)return;
@@ -538,13 +571,13 @@ document.addEventListener('keydown',event=>{
 });
 
 function unavailableHTML(){return `<div class="start-screen"><div class="start-kicker">DAILY CHALLENGE</div><h2>NOT AVAILABLE<br>YET.</h2><p>No question set is published for today. Your previous progress is saved. Come back when a new daily game is published.</p><button class="cta big" data-modal="archive">OPEN ARCHIVE ↗</button></div>`}
-function render(){const retainedChart=document.querySelector('#gameArea > .end-screen .mock-stat-card');const legacyCompletion=phase==='intro'&&REMOTE.counted&&!REMOTE.progress&&!curProgress().completed;document.body.classList.toggle('edge-ended',phase==='end'||legacyCompletion);document.body.classList.toggle('edge-playing',phase==='play');document.body.classList.toggle('edge-run',phase!=='intro');document.body.classList.toggle('edge-intro',phase==='intro');document.body.dataset.closeishEndTab=mobileEndTab;const p=curProgress();if(phase==='intro'&&p.completed)phase='end';const inner=!dayPack()?unavailableHTML():phase==='intro'?introHTML():phase==='play'?arenaHTML():phase==='reveal'?revealHTML():endHTML();el.innerHTML=`<header class="topbar"><div class="top-inner"><button class="logo" id="homeBtn" type="button" aria-label="${phase==='play'||phase==='reveal'?'Home navigation unavailable during the challenge':'CLOSEISH home'}" ${phase==='play'||phase==='reveal'?'disabled title="Finish all six rounds to return home"':''}>CLOSE<span class="period">ISH</span><svg viewBox="0 0 28 28" aria-hidden="true"><path fill="#ff6a55" stroke="#19151f" stroke-width="2" d="M14 1L18 9 27 7 22 15 27 23 17 21 13 28 10 19 1 20 6 13 2 5 11 9Z"/></svg></button><nav class="mainnav" aria-label="Main navigation">${unitControlHTML()}<button class="navbutton navsuggest" data-modal="suggest">SUGGEST +</button><button class="navbutton" data-modal="rules">HOW TO PLAY</button><button class="navbutton navarchive" data-modal="archive">ARCHIVE ↗</button>${BOOT.date!==(BOOT.current_date||BOOT.date)?'<button class="navbutton" id="todayNav">TODAY ↗</button>':''}</nav></div></header><div class="ticker"><span>${('✳ KNOW IT. RISK IT. NAIL IT. &nbsp;&nbsp;&nbsp; ✳ ANY TOPIC. ONE LIMIT. &nbsp;&nbsp;&nbsp; ✳ NO GUESSING FROM A LIST. &nbsp;&nbsp;&nbsp; ').repeat(9)}</span></div><section class="hero"><div class="hero-inner"><div class="hero-copy"><div class="eyebrow"><i class="line"></i> THE DAILY GAME OF LIMITS</div><h1>CLOSE<span>ISH</span></h1><p class="hero-sub">Know something weird? <em>Put it on the line.</em></p></div><div class="hero-art" aria-hidden="true"><div class="art-panel"><div class="art-limit"></div><div class="art-label">THE LIMIT</div><svg class="art-line" viewBox="0 0 250 160"><polyline points="5,138 42,118 81,127 116,85 151,98 183,43 211,64 240,12"/><circle cx="240" cy="12" r="11"/></svg></div><div class="art-sticker">CLOSE<br>CALL!</div></div></div></section><div class="breakline">★ <b>THINK HARD</b> ★ <b>GO BIG</b> ★ <b>CHECK THE DIRECTION</b> ★ <b>COME BACK TOMORROW</b> ★</div><main class="shell content"><div class="section-head"><div><div class="micro">${BOOT.date===(BOOT.current_date||BOOT.date)?'THE DAILY CHALLENGE':'ARCHIVE CHALLENGE · '+BOOT.date}</div></div><div class="day-badge">${dayPack()?'CHALLENGE #'+String(dayNum).padStart(3,'0'):BOOT.date}</div></div><div class="playgrid"> <section class="card maincard" id="gameArea">${inner}</section></div></main><footer class="shell footer"><strong>CLOSEISH / KNOW YOUR LIMITS.</strong><span>Wildly specific limits. Free-text answers. No ads.</span></footer>${modalHTML()}`;
+function render(){const retainedChart=document.querySelector('#gameArea > .end-screen .mock-stat-card');const legacyCompletion=phase==='intro'&&REMOTE.counted&&!REMOTE.progress&&!curProgress().completed;document.body.classList.toggle('edge-ended',phase==='end'||legacyCompletion);document.body.classList.toggle('edge-playing',phase==='play');document.body.classList.toggle('edge-run',phase!=='intro');document.body.classList.toggle('edge-intro',phase==='intro');document.body.dataset.closeishEndTab=mobileEndTab;const p=curProgress();if(phase==='intro'&&p.completed)phase='end';const inner=!dayPack()?unavailableHTML():phase==='intro'?introHTML():phase==='play'?arenaHTML():phase==='reveal'?revealHTML():endHTML();el.innerHTML=`<header class="topbar"><div class="top-inner"><button class="logo" id="homeBtn" type="button" aria-label="${phase==='play'||phase==='reveal'?'Home navigation unavailable during the challenge':'CLOSEISH home'}" ${phase==='play'||phase==='reveal'?'disabled title="Finish all six rounds to return home"':''}>CLOSE<span class="period">ISH</span><svg viewBox="0 0 28 28" aria-hidden="true"><path fill="#ff6a55" stroke="#19151f" stroke-width="2" d="M14 1L18 9 27 7 22 15 27 23 17 21 13 28 10 19 1 20 6 13 2 5 11 9Z"/></svg></button><nav class="mainnav" aria-label="Main navigation">${unitControlHTML()}<button class="navbutton navsuggest" data-modal="suggest">SUGGEST +</button><button class="navbutton" data-modal="rules">HOW TO PLAY</button><button class="navbutton navarchive" data-modal="archive">ARCHIVE ↗</button><button class="navbutton navcontact" data-modal="contact">CONTACT ↗</button>${BOOT.date!==(BOOT.current_date||BOOT.date)?'<button class="navbutton" id="todayNav">TODAY ↗</button>':''}</nav></div></header><div class="ticker"><span>${('✳ KNOW IT. RISK IT. NAIL IT. &nbsp;&nbsp;&nbsp; ✳ ANY TOPIC. ONE LIMIT. &nbsp;&nbsp;&nbsp; ✳ NO GUESSING FROM A LIST. &nbsp;&nbsp;&nbsp; ').repeat(9)}</span></div><section class="hero"><div class="hero-inner"><div class="hero-copy"><div class="eyebrow"><i class="line"></i> THE DAILY GAME OF LIMITS</div><h1>CLOSE<span>ISH</span></h1><p class="hero-sub">Know something weird? <em>Put it on the line.</em></p></div><div class="hero-art" aria-hidden="true"><div class="art-panel"><div class="art-limit"></div><div class="art-label">THE LIMIT</div><svg class="art-line" viewBox="0 0 250 160"><polyline points="5,138 42,118 81,127 116,85 151,98 183,43 211,64 240,12"/><circle cx="240" cy="12" r="11"/></svg></div><div class="art-sticker">CLOSE<br>CALL!</div></div></div></section><div class="breakline">★ <b>THINK HARD</b> ★ <b>GO BIG</b> ★ <b>CHECK THE DIRECTION</b> ★ <b>COME BACK TOMORROW</b> ★</div><main class="shell content"><div class="section-head"><div><div class="micro">${BOOT.date===(BOOT.current_date||BOOT.date)?'THE DAILY CHALLENGE':'ARCHIVE CHALLENGE · '+BOOT.date}</div></div><div class="day-badge">${dayPack()?'CHALLENGE #'+String(dayNum).padStart(3,'0'):BOOT.date}</div></div><div class="playgrid"> <section class="card maincard" id="gameArea">${inner}</section></div></main><footer class="shell footer"><span class="footer-name">CLOSEISH</span><a class="footer-privacy" href="/privacy.html" target="_blank" rel="noopener noreferrer">PRIVACY POLICY ↗</a></footer>${modalHTML()}`;
  // Keep only a small paint hint for next visit; game data always comes from PostgreSQL.
  globalThis.CLOSEISHStartup?.rememberView(BOOT.date,phase==='end'||legacyCompletion||(phase==='reveal'&&p.completed)?'results':phase==='play'||phase==='reveal'?'round':'intro');
  // An overlay, navigation, or archive refresh must not redraw or restart the chart.
  if(retainedChart&&(phase==='end'||legacyCompletion))document.querySelector('.end-screen .mock-stat-card')?.replaceWith(retainedChart);
  bindUnitControl();
- document.getElementById('todayNav')?.addEventListener('click',()=>{if(phase==='play'||phase==='reveal')return;location.assign(location.pathname)});document.getElementById('homeBtn')?.addEventListener('click',()=>{if(phase==='play'||phase==='reveal')return;stopClock();answerBookOpen=null;catalogueLockedHeight=null;phase=curProgress().completed?'end':'intro';render()});document.querySelectorAll('[data-modal]').forEach(b=>b.addEventListener('click',()=>{modalTrigger=`[data-modal="${b.dataset.modal}"]`;showModal=b.dataset.modal;if(showModal==='rules')globalThis.CLOSEISHCommunity.resetGuide();if(showModal==='archive'){archiveMonthIndex=0;loadArchiveMonth()}render()}));document.getElementById('closeModal')?.addEventListener('click',closeOverlay);document.getElementById('modalWrap')?.addEventListener('mousedown',e=>{if(e.target.id==='modalWrap')closeOverlay()});document.querySelectorAll('[data-cal-step]').forEach(b=>b.addEventListener('click',()=>{archiveMonthIndex+=Number(b.dataset.calStep);loadArchiveMonth();render()}));document.querySelectorAll('[data-day]').forEach(b=>b.addEventListener('click',()=>{showModal=null;showDay(b.dataset.day)}));
+ document.getElementById('todayNav')?.addEventListener('click',()=>{if(phase==='play'||phase==='reveal')return;location.assign(location.pathname)});document.getElementById('homeBtn')?.addEventListener('click',()=>{if(phase==='play'||phase==='reveal')return;stopClock();answerBookOpen=null;catalogueLockedHeight=null;phase=curProgress().completed?'end':'intro';render()});document.querySelectorAll('[data-modal]').forEach(b=>b.addEventListener('click',()=>{modalTrigger=`[data-modal="${b.dataset.modal}"]`;showModal=b.dataset.modal;if(showModal==='stats')scoreBandPage=0;if(showModal==='rules')globalThis.CLOSEISHCommunity.resetGuide();if(showModal==='archive'){archiveMonthIndex=0;loadArchiveMonth()}render()}));document.getElementById('closeModal')?.addEventListener('click',closeOverlay);if(showModal==='stats')bindBandPageButtons(document.querySelector('.modal-stats .modalcontent'));document.getElementById('modalWrap')?.addEventListener('mousedown',e=>{if(e.target.id==='modalWrap')closeOverlay()});document.querySelectorAll('[data-cal-step]').forEach(b=>b.addEventListener('click',()=>{archiveMonthIndex+=Number(b.dataset.calStep);loadArchiveMonth();render()}));document.querySelectorAll('[data-day]').forEach(b=>b.addEventListener('click',()=>{showModal=null;showDay(b.dataset.day)}));
  document.getElementById('startBtn')?.addEventListener('click',()=>{let saved=curProgress();if(saved.completed){phase='end';render();return}if(Number.isInteger(saved.activeRound)&&saved.activeDeadline){round=saved.activeRound;deadline=saved.activeDeadline;restoreDraft(saved);phase='play';render();if(timerRemaining()<=0)timeoutRound();else startClock();return}round=saved.responses.findIndex(x=>!x);if(round<0)round=saved.responses.length||0;playRound()});document.getElementById('answerForm')?.addEventListener('submit',e=>{e.preventDefault();submitAnswer()});
  const field=document.getElementById('guess');if(field){field.addEventListener('input',updateHints);if(inputValue){activeHints=candidateMatches(currentQ(),inputValue);refreshInlineHint()}}
  document.getElementById('skipBtn')?.addEventListener('click',skipRound);document.getElementById('nextBtn')?.addEventListener('click',nextRound);document.getElementById('reviewBtn')?.addEventListener('click',submitReview);document.getElementById('shareBtn')?.addEventListener('click',share);
@@ -556,7 +589,7 @@ function render(){const retainedChart=document.querySelector('#gameArea > .end-s
  [...el.children].forEach(child=>{if(child.id!=='modalWrap')child.inert=Boolean(showModal)});
  if(showModal==='suggest')globalThis.CLOSEISHCommunity.bindSuggestion();
  if(showModal==='rules')globalThis.CLOSEISHCommunity.bindGuide(render,closeOverlay);
- if(showModal)document.getElementById('closeModal')?.focus();
+ if(showModal){document.getElementById('closeModal')?.focus();}
  globalThis.CLOSEISHMobileViewport?.sync();
  if((phase==='end'&&curProgress().completed)||legacyCompletion)requestChartSnapshotOnce();
 }
@@ -586,7 +619,7 @@ function restore(){
 // The statistics panel is replaced after server refreshes: event delegation survives.
 document.addEventListener('click',event=>{
  if(!event.target.closest('[data-exact-counts]'))return;
- modalTrigger='[data-exact-counts]';showModal='stats';render();
+ modalTrigger='[data-exact-counts]';showModal='stats';scoreBandPage=0;render();
 });
 window.addEventListener('closeish-statistics',()=>{
  const panel=document.querySelector('.end-screen .mock-stat-card');
