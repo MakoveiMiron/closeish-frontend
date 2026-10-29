@@ -1,3 +1,17 @@
+## V18.10 – Mobilos köreredmény: hézagok és továbblépés javítása
+
+- A köreredmény címét, pontozási tábláját, rövid magyarázatát és a NEXT ROUND / SEE MY SCORE gombot **egyetlen, szorosan egymás alatti blokkba** rendeztük. Nincs több teljes magasságra szétosztott üres tér (a korábbi `justify-content: space-between` megszűnt mobilon).
+- A gomb közvetlenül a magyarázat után található, így a Messenger és más beágyazott mobilböngészők változó címsormagassága mellett sem szorul a képernyő aljára.
+- Kizárólag a **700 CSS-pixel alatti mobilos köreredmény** változott; az asztali kinézet, az API és a pontozás érintetlen.
+- Az `index.html` és a `privacy.html` statikus erőforrásainak verzióparamétere `18.10.0`, mert az előző csomag tévedésből még `18.8.0`-t használt: egyes böngészők ezáltal a régi CSS-t tarthatták meg.
+- Célzott regressziós teszt: `python tests/round-result-mobile-v1810.browser.py`. 10 mobilfelbontás × 3 tartalmi helyzet (kihagyás, lejárat, hosszú válasz), hézagok és gombkattintás ellenőrzésével.
+
+---
+
+## V18.9 – Mobilos köreredmény elrendezési javítás
+
+A köreredmény-kártya fejlécét a magasságszámítás külön kezeli; a NEXT ROUND / SEE MY SCORE gomb így nem lóg ki a kártya alól. A cím, a ponttáblázat és a magyarázat egy háromszakaszos mobilos elrendezést alkot: cím fent, összetartozó eredményadatok középen, továbblépés alul. Hosszú szabad szöveges válaszoknál a kijelzőn a válasz maximum három sort foglalhat el. Asztali elrendezés és backend változatlan.
+
 ## V18.4 – kompakt eredményképernyő és teljes ponttáblázat
 
 - Sikeres eredménymentésnél a zöld `RESULT COUNTED ON THE SERVER` sáv nem jelenik meg. A mentésellenőrzés továbbra is fut, és sikertelen vagy függő rögzítésnél a figyelmeztetés megmarad.
